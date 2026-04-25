@@ -26,6 +26,8 @@ class CongVanModel:
                 cursor = conn.cursor()
                 cursor.execute(sql, params)
                 # Lấy tên cột từ mô tả của cursor
+                if cursor.description is None:
+                    return [] # Tránh lỗi với các câu lệnh INSERT/UPDATE/DELETE không có kết quả trả về
                 columns = [col[0] for col in cursor.description]
                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
         except Exception as e:

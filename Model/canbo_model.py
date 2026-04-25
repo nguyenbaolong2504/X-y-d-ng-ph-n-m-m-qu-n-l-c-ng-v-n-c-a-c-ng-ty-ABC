@@ -4,18 +4,17 @@ from config import DB_CONFIG
 
 class CanBoModel:
     def __init__(self):
-        # Thiết lập chuỗi kết nối từ config
-        if 'trusted_connection' in DB_CONFIG:
+        # THAY THẾ CHUỖI KẾT NỐI CŨ BẰNG ĐOẠN NÀY:
+        if DB_CONFIG.get('trusted_connection') == 'yes' or DB_CONFIG.get('trusted_connection') is True:
             self.conn_str = (
                 f"DRIVER={DB_CONFIG['driver']};SERVER={DB_CONFIG['server']};"
-                f"DATABASE={DB_CONFIG['database']};Trusted_Connection={DB_CONFIG['trusted_connection']};"
+                f"DATABASE={DB_CONFIG['database']};Trusted_Connection=yes;"
             )
         else:
             self.conn_str = (
                 f"DRIVER={DB_CONFIG['driver']};SERVER={DB_CONFIG['server']};"
                 f"DATABASE={DB_CONFIG['database']};UID={DB_CONFIG['username']};PWD={DB_CONFIG['password']};"
             )
-
     def _get_connection(self):
         return pyodbc.connect(self.conn_str)
 

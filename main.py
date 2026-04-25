@@ -1,6 +1,30 @@
 import sys
 import os
-# Thêm QMessageBox vào danh sách import
+import pyodbc  # Bắt buộc import pyodbc ở đây để cài bẫy
+
+# =====================================================================
+# THỦ THUẬT MONKEY PATCHING: ĐÁNH CHẶN MỌI KẾT NỐI TỪ CÁC FILE CỦA NHÓM
+# =====================================================================
+# 1. Cất giữ lại hàm kết nối gốc của thư viện pyodbc
+_original_pyodbc_connect = pyodbc.connect
+
+# 2. Tạo ra một hàm kết nối "giả mạo"
+def _intercept_connect(*args, **kwargs):
+    # Chuỗi kết nối CHUẨN trên máy của bạn (Dùng localhost và Windows Auth)
+    # Bỏ qua mọi cấu hình sai lệch từ máy các bạn khác
+    my_local_conn_str = (
+        "DRIVER={ODBC Driver 17 for SQL Server};"
+        "SERVER=localhost;"
+        "DATABASE=congtyadc;"
+        "Trusted_Connection=yes;"
+    )
+    # Tự động kết nối bằng chuỗi của máy bạn
+    return _original_pyodbc_connect(my_local_conn_str)
+
+# 3. Tráo đổi hàm kết nối của hệ thống bằng hàm giả mạo
+pyodbc.connect = _intercept_connect
+# =====================================================================
+
 from PyQt6.QtWidgets import (QApplication, QLabel, QMainWindow, QWidget, 
                              QVBoxLayout, QHBoxLayout, QListWidget, QStackedWidget, 
                              QListWidgetItem, QFrame, QMessageBox)
@@ -9,11 +33,9 @@ from PyQt6.QtGui import QFont
 
 sys.path.insert(0, os.getcwd())
 
-# === THIẾT LẬP CHUỖI KẾT NỐI SQL SERVER DÙNG CHUNG ===
-# Đã thêm chữ 'r' để sửa lỗi "\S"
-CONN_STR = r"DRIVER={SQL Server};SERVER=.\SQLEXPRESS;DATABASE=congtyadc;Trusted_Connection=yes;"
+# === THIẾT LẬP CHUỖI KẾT NỐI CHUNG ===
+CONN_STR = r"DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=congtyadc;Trusted_Connection=yes;"
 
-# === Import các module với cơ chế kiểm tra an toàn ===
 def safe_import(module_name, class_name):
     try:
         module = __import__(module_name, fromlist=[class_name])
@@ -45,6 +67,19 @@ CanBoController, _ = safe_import("Controller.canbo_controller", "CanBoController
 ChucVuModel, CHUCVU_OK = safe_import("Model.chucvu_model", "ChucVuModel")
 ChucVuWindow, _ = safe_import("View.quanlychucvu", "ChucVuWindow")
 ChucVuController, _ = safe_import("Controller.chucvu_controller", "ChucVuController")
+
+HanBaoQuanModel, HBQ_OK = safe_import("Model.hanbaoquan_model", "HanBaoQuanModel")
+HanBaoQuanWindow, _ = safe_import("View.quanlyhanbaoquan", "HanBaoQuanWindow")
+HanBaoQuanController, _ = safe_import("Controller.hanbaoquan_controller", "HanBaoQuanController")
+
+LoaiVanBanModel, LVB_OK = safe_import("Model.loaivanban_model", "LoaiVanBanModel")
+LoaiVanBanWindow, _ = safe_import("View.quanlyloaivanban", "LoaiVanBanWindow")
+LoaiVanBanController, _ = safe_import("Controller.loaivanban_controller", "LoaiVanBanController")
+
+# --- THÊM MỚI: IMPORT MODULE ĐƠN VỊ ---
+DonViModel, DV_OK = safe_import("Model.donvi_model", "DonViModel")
+DonViWindow, _ = safe_import("View.quanlydonvi", "DonViWindow")
+DonViController, _ = safe_import("Controller.donvi_controller", "DonViController")
 
 class MainApp(QMainWindow):
     def __init__(self):
@@ -109,7 +144,18 @@ class MainApp(QMainWindow):
         hamburger_item.setFlags(Qt.ItemFlag.NoItemFlags) 
         self.sidebar.addItem(hamburger_item)
 
-        menu_items = ["🏠 Tổng quan hệ thống", "📥 Văn bản đến", "📤 Văn bản đi", "📄 Văn bản nội bộ", "👥 Danh sách cán bộ", "📂 Danh mục chức vụ"]
+        # ĐÃ THÊM: "🏢 Đơn vị, bộ phận" vào menu
+        menu_items = [
+            "🏠 Tổng quan hệ thống", 
+            "📥 Văn bản đến", 
+            "📤 Văn bản đi", 
+            "📄 Văn bản nội bộ", 
+            "👥 Danh sách cán bộ", 
+            "📂 Danh mục chức vụ", 
+            "⏳ Thời hạn bảo quản", 
+            "🏷️ Loại văn bản",
+            "🏢 Đơn vị, bộ phận"
+        ]
         for text in menu_items:
             self.sidebar.addItem(QListWidgetItem(text))
 
@@ -173,15 +219,53 @@ class MainApp(QMainWindow):
         else:
             self.stacked_widget.addWidget(QLabel("Module Chức vụ chưa sẵn sàng"))
 
-        # Khởi tạo các Controller
+        # 6. Danh mục Thời hạn bảo quản
+        if HBQ_OK:
+            try:
+                self.tab_hbq = HanBaoQuanWindow()
+                hbq_model = HanBaoQuanModel(CONN_STR)
+                self.hbq_controller = HanBaoQuanController(hbq_model, self.tab_hbq)
+                self.stacked_widget.addWidget(self.tab_hbq)
+            except Exception as e:
+                self.stacked_widget.addWidget(QLabel(f"❌ Lỗi module Thời hạn bảo quản: {str(e)}"))
+        else:
+            self.stacked_widget.addWidget(QLabel("Module Thời hạn bảo quản chưa sẵn sàng"))
+
+        # 7. Danh mục Loại văn bản
+        if LVB_OK:
+            try:
+                self.tab_lvb = LoaiVanBanWindow()
+                self.ctrl_lvb_den = LoaiVanBanController(
+                    LoaiVanBanModel(CONN_STR, "PhanLoaiCongVanDen"), 
+                    self.tab_lvb.view_den
+                )
+                self.ctrl_lvb_di = LoaiVanBanController(
+                    LoaiVanBanModel(CONN_STR, "PhanLoaiCongVanPhatHanh"), 
+                    self.tab_lvb.view_di
+                )
+                self.stacked_widget.addWidget(self.tab_lvb)
+            except Exception as e:
+                self.stacked_widget.addWidget(QLabel(f"❌ Lỗi module Loại văn bản: {str(e)}"))
+
+        # --- THÊM MỚI: 8. Danh mục Đơn vị, bộ phận ---
+        if DV_OK:
+            try:
+                self.tab_dv = DonViWindow()
+                dv_model = DonViModel(CONN_STR)
+                self.dv_controller = DonViController(dv_model, self.tab_dv)
+                self.stacked_widget.addWidget(self.tab_dv)
+            except Exception as e:
+                self.stacked_widget.addWidget(QLabel(f"❌ Lỗi module Đơn vị: {str(e)}"))
+        else:
+            self.stacked_widget.addWidget(QLabel("Module Đơn vị chưa sẵn sàng"))
+
+        # Khởi tạo các Controller chung
         try:
             self.den_controller = CongVanController(CongVanModel(), self.tab_den)
             self.di_controller = CongVanDiController(CongVanDiModel(), self.tab_di)
             if NOIBO_OK:
                 self.noibo_controller = ControllerNoiBo(ModelNoiBo(), self.tab_noibo)
             
-            # --- ĐÃ SỬA: KẾT NỐI THÔNG QUA TAB_DEN ---
-            # Chỉ kết nối nếu nút tồn tại trong tab_den
             if hasattr(self.tab_den, 'btn_refresh'):
                 self.tab_den.btn_refresh.clicked.connect(self.tab_den.nap_dulieu_signal.emit)
             
