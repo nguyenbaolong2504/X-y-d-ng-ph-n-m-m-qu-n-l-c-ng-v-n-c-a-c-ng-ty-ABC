@@ -76,10 +76,16 @@ LoaiVanBanModel, LVB_OK = safe_import("Model.loaivanban_model", "LoaiVanBanModel
 LoaiVanBanWindow, _ = safe_import("View.quanlyloaivanban", "LoaiVanBanWindow")
 LoaiVanBanController, _ = safe_import("Controller.loaivanban_controller", "LoaiVanBanController")
 
-# --- THÊM MỚI: IMPORT MODULE ĐƠN VỊ ---
+# --- IMPORT MODULE ĐƠN VỊ ---
 DonViModel, DV_OK = safe_import("Model.donvi_model", "DonViModel")
 DonViWindow, _ = safe_import("View.quanlydonvi", "DonViWindow")
 DonViController, _ = safe_import("Controller.donvi_controller", "DonViController")
+
+# --- THÊM MỚI: IMPORT MODULE XỬ LÝ CÔNG VĂN ---
+XuLyCongVanModel, XULY_OK = safe_import("Model.xulycongvan_model", "XuLyCongVanModel")
+QuanLyXuLyCongVanView, _ = safe_import("View.quanlyxulycongvan", "QuanLyXuLyCongVanView")
+CongVanControllerCustom, _ = safe_import("Controller.xulycongvan_controller", "CongVanController")
+
 
 class MainApp(QMainWindow):
     def __init__(self):
@@ -144,7 +150,7 @@ class MainApp(QMainWindow):
         hamburger_item.setFlags(Qt.ItemFlag.NoItemFlags) 
         self.sidebar.addItem(hamburger_item)
 
-        # ĐÃ THÊM: "🏢 Đơn vị, bộ phận" vào menu
+        # --- MENU ITEMS CẬP NHẬT: Thêm "Xử lý công văn" ---
         menu_items = [
             "🏠 Tổng quan hệ thống", 
             "📥 Văn bản đến", 
@@ -154,7 +160,8 @@ class MainApp(QMainWindow):
             "📂 Danh mục chức vụ", 
             "⏳ Thời hạn bảo quản", 
             "🏷️ Loại văn bản",
-            "🏢 Đơn vị, bộ phận"
+            "🏢 Đơn vị, bộ phận",
+            "⚙️ Xử lý công văn"
         ]
         for text in menu_items:
             self.sidebar.addItem(QListWidgetItem(text))
@@ -247,7 +254,7 @@ class MainApp(QMainWindow):
             except Exception as e:
                 self.stacked_widget.addWidget(QLabel(f"❌ Lỗi module Loại văn bản: {str(e)}"))
 
-        # --- THÊM MỚI: 8. Danh mục Đơn vị, bộ phận ---
+        # 8. Danh mục Đơn vị, bộ phận
         if DV_OK:
             try:
                 self.tab_dv = DonViWindow()
@@ -258,6 +265,20 @@ class MainApp(QMainWindow):
                 self.stacked_widget.addWidget(QLabel(f"❌ Lỗi module Đơn vị: {str(e)}"))
         else:
             self.stacked_widget.addWidget(QLabel("Module Đơn vị chưa sẵn sàng"))
+
+        # --- THÊM MỚI: 9. Xử lý công văn ---
+        if XULY_OK:
+            try:
+                self.tab_xuly = QuanLyXuLyCongVanView()
+                # Khởi tạo kết nối db để truyền vào Model theo đúng code hôm qua
+                db_conn = pyodbc.connect(CONN_STR)
+                xl_model = XuLyCongVanModel(db_conn)
+                self.xuly_controller = CongVanControllerCustom(self.tab_xuly, xl_model)
+                self.stacked_widget.addWidget(self.tab_xuly)
+            except Exception as e:
+                self.stacked_widget.addWidget(QLabel(f"❌ Lỗi module Xử lý công văn: {str(e)}"))
+        else:
+            self.stacked_widget.addWidget(QLabel("Module Xử lý công văn chưa sẵn sàng"))
 
         # Khởi tạo các Controller chung
         try:
