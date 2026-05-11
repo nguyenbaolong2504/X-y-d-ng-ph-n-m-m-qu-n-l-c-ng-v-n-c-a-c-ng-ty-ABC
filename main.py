@@ -9,13 +9,13 @@ import pyodbc
 _original_pyodbc_connect = pyodbc.connect
 
 def _intercept_connect(*args, **kwargs):
-
-    my_local_conn_str = ( 
-        "DRIVER={SQL Server};" 
-        "SERVER=.\\SQLEXPRESS;" 
-        "DATABASE=congtyadc;" 
-        "Trusted_Connection=yes;" 
-        )
+    # TRẢ VỀ LOCALHOST VÌ MÁY BẠN DÙNG TÊN NÀY MỚI CHẠY ĐƯỢC
+    my_local_conn_str = (
+        "DRIVER={ODBC Driver 17 for SQL Server};"
+        "SERVER=localhost;" 
+        "DATABASE=congtyadc;"
+        "Trusted_Connection=yes;"
+    )
 
     return _original_pyodbc_connect(my_local_conn_str)
 
@@ -48,8 +48,8 @@ sys.path.insert(0, os.getcwd())
 # =====================================================================
 
 CONN_STR = r""" 
-DRIVER={SQL Server}; 
-SERVER=.\SQLEXPRESS; 
+DRIVER={ODBC Driver 17 for SQL Server}; 
+SERVER=localhost; 
 DATABASE=congtyadc; 
 Trusted_Connection=yes; 
 """
@@ -167,19 +167,20 @@ HanBaoQuanController, _ = safe_import(
     "HanBaoQuanController"
 )
 
-LoaiVanBanModel, LVB_OK = safe_import(
-    "Model.loaivanban_model",
-    "LoaiVanBanModel"
+# === ĐÃ SỬA: SỬ DỤNG LOAICONGVAN ===
+LoaiCongVanModel, LCV_OK = safe_import(
+    "Model.loaicongvan_model",
+    "LoaiCongVanModel"
 )
 
-LoaiVanBanWindow, _ = safe_import(
-    "View.quanlyloaivanban",
-    "LoaiVanBanWindow"
+LoaiCongVanWindow, _ = safe_import(
+    "View.quanlyloaicongvan",
+    "LoaiCongVanWindow"
 )
 
-LoaiVanBanController, _ = safe_import(
-    "Controller.loaivanban_controller",
-    "LoaiVanBanController"
+LoaiCongVanController, _ = safe_import(
+    "Controller.loaicongvan_controller",
+    "LoaiCongVanController"
 )
 
 # =====================================================================
@@ -367,18 +368,15 @@ class MainApp(QMainWindow):
         menu_items = [
 
             "🏠 Tổng quan hệ thống",
-
             "📥 Văn bản đến",
             "📤 Văn bản đi",
             "📄 Văn bản nội bộ",
-
             "👥 Danh sách cán bộ",
             "📂 Danh mục chức vụ",
             "⏳ Thời hạn bảo quản",
-            "🏷️ Loại văn bản",
+            "🏷️ Loại công văn",
             "🏢 Đơn vị, bộ phận",
-            "⚙️ Xử lý công văn"
-
+            "⚙️ Xử lý công văn",
             "🔐 Phân quyền sử dụng",
             "🗂️ Mục lục hồ sơ",
             "📁 Danh mục hồ sơ",
@@ -565,41 +563,22 @@ class MainApp(QMainWindow):
             )
 
         # =============================================================
-        # 7. LOẠI VĂN BẢN
+        # 7. LOẠI CÔNG VĂN (ĐÃ FIX THEO CODE MỚI)
         # =============================================================
 
-        if LVB_OK:
-
+        if LCV_OK:
             try:
-
-                self.tab_lvb = LoaiVanBanWindow()
-
-                self.ctrl_lvb_den = LoaiVanBanController(
-                    LoaiVanBanModel(
-                        CONN_STR,
-                        "PhanLoaiCongVanDen"
-                    ),
-                    self.tab_lvb.view_den
-                )
-
-                self.ctrl_lvb_di = LoaiVanBanController(
-                    LoaiVanBanModel(
-                        CONN_STR,
-                        "PhanLoaiCongVanPhatHanh"
-                    ),
+                self.tab_lvb = LoaiCongVanWindow()
+                self.ctrl_lvb = LoaiCongVanController(
+                    LoaiCongVanModel(CONN_STR),
+                    self.tab_lvb.view_den,
                     self.tab_lvb.view_di
                 )
-
-        # 8. Danh mục Đơn vị, bộ phận
-                self.stacked_widget.addWidget(
-                    self.tab_lvb
-                )
-
+                self.stacked_widget.addWidget(self.tab_lvb)
             except Exception as e:
-
-                self.stacked_widget.addWidget(
-                    QLabel(f"❌ Lỗi loại văn bản: {str(e)}")
-                )
+                self.stacked_widget.addWidget(QLabel(f"❌ Lỗi Loại công văn: {str(e)}"))
+        else:
+            self.stacked_widget.addWidget(QLabel("Module Loại công văn chưa sẵn sàng"))
 
         # =============================================================
         # 8. ĐƠN VỊ
@@ -647,7 +626,7 @@ class MainApp(QMainWindow):
             self.stacked_widget.addWidget(QLabel("Module Xử lý công văn chưa sẵn sàng"))
 
         # =============================================================
-        # 9. PHÂN QUYỀN
+        # 10. PHÂN QUYỀN
         # =============================================================
 
         try:
@@ -665,7 +644,7 @@ class MainApp(QMainWindow):
             )
 
         # =============================================================
-        # 10. MỤC LỤC HỒ SƠ
+        # 11. MỤC LỤC HỒ SƠ
         # =============================================================
 
         try:
@@ -683,7 +662,7 @@ class MainApp(QMainWindow):
             )
 
         # =============================================================
-        # 11. DANH MỤC HỒ SƠ
+        # 12. DANH MỤC HỒ SƠ
         # =============================================================
 
         try:
@@ -701,7 +680,7 @@ class MainApp(QMainWindow):
             )
 
         # =============================================================
-        # 12. CÔNG VIỆC
+        # 13. CÔNG VIỆC
         # =============================================================
 
         try:

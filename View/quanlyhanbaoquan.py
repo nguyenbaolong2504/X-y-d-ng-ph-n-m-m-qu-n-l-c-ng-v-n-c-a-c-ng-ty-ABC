@@ -129,7 +129,6 @@ class HanBaoQuanWindow(QWidget):
         self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels(["STT", "Tên thời hạn", "Ghi chú", "Thao tác"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        # NỚI RỘNG CỘT THAO TÁC LÊN 160 ĐỂ ĐỦ CHỖ CHO 2 NÚT CÓ CHỮ
         self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         self.table.setColumnWidth(3, 160) 
         self.table.verticalHeader().setVisible(False) 
@@ -169,7 +168,6 @@ class HanBaoQuanWindow(QWidget):
             btn_layout.setContentsMargins(0, 0, 0, 0)
             btn_layout.setSpacing(8)
             
-            # TRẢ LẠI CHỮ "SỬA" VÀ TĂNG KÍCH THƯỚC LÊN 70px
             btn_edit = QPushButton("Sửa")
             btn_edit.setFixedSize(70, 30)
             btn_edit.setToolTip("Sửa thông tin")
@@ -180,7 +178,6 @@ class HanBaoQuanWindow(QWidget):
             """)
             btn_edit.clicked.connect(lambda ch, r=row: self.sua_signal.emit(r))
             
-            # TRẢ LẠI CHỮ "XÓA" VÀ TĂNG KÍCH THƯỚC LÊN 70px
             btn_del = QPushButton("Xóa")
             btn_del.setFixedSize(70, 30)
             btn_del.setToolTip("Xóa mục này")

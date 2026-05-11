@@ -1,5 +1,6 @@
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import pyqtSignal, Qt
+import textwrap # Import thư viện ngắt dòng tự động cho Tooltip
 
 class DonViWindow(QWidget):
     them_signal = pyqtSignal()
@@ -63,13 +64,25 @@ class DonViWindow(QWidget):
         self.table.verticalHeader().setVisible(False)
         self.table.setShowGrid(True)
         self.table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.table.setWordWrap(True)
-        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        self.table.verticalHeader().setMinimumSectionSize(50)
         
+        # Tắt tự động xuống dòng và ép chiều cao cố định để bảng gọn gàng, hiện dấu ...
+        self.table.setWordWrap(False)
+        self.table.verticalHeader().setDefaultSectionSize(50)
+        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
+        
+        # Thêm CSS cho Tooltip vuông vắn nền trắng chữ đen
         self.table.setStyleSheet("""
             QTableWidget { border: 1px solid #dcdde1; gridline-color: #ecf0f1; color: #2c3e50; font-size: 13px;} 
             QHeaderView::section { background-color: #f8f9fa; color: #2c3e50; font-weight: bold; border: 1px solid #ecf0f1; padding: 10px;}
+            QTableWidget::item { padding: 5px; }
+            QToolTip {
+                background-color: #ffffff;
+                color: #000000;
+                border: 1px solid #7f8c8d;
+                border-radius: 4px;
+                padding: 6px;
+                font-size: 13px;
+            }
         """)
         layout.addWidget(self.table)
 
@@ -83,40 +96,51 @@ class DonViWindow(QWidget):
         for i, r in enumerate(data):
             self.table.insertRow(i)
             
+            # STT
             stt = QTableWidgetItem(str(i+1))
             stt.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table.setItem(i, 0, stt)
             
-            ten = QTableWidgetItem(str(r['TenDonVi'] or ""))
+            # Tên đơn vị (Thêm Tooltip)
+            ten_str = str(r['TenDonVi'] or "")
+            ten = QTableWidgetItem(ten_str)
+            if ten_str.strip():
+                ten.setToolTip("<br>".join(textwrap.wrap(ten_str, width=50)))
             self.table.setItem(i, 1, ten)
             
-            dc = QTableWidgetItem(str(r['DiaChi'] or ""))
+            # Địa chỉ (Thêm Tooltip)
+            dc_str = str(r['DiaChi'] or "")
+            dc = QTableWidgetItem(dc_str)
+            if dc_str.strip():
+                dc.setToolTip("<br>".join(textwrap.wrap(dc_str, width=50)))
             self.table.setItem(i, 2, dc)
             
+            # Điện thoại
             sdt = QTableWidgetItem(str(r['DienThoai'] or ""))
             sdt.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table.setItem(i, 3, sdt)
             
-            email = QTableWidgetItem(str(r['Email'] or ""))
+            # Email (Thêm Tooltip)
+            email_str = str(r['Email'] or "")
+            email = QTableWidgetItem(email_str)
+            if email_str.strip():
+                email.setToolTip("<br>".join(textwrap.wrap(email_str, width=50)))
             self.table.setItem(i, 4, email)
             
-            # === CẬP NHẬT: XỬ LÝ LINK WEBSITE CÓ THỂ CLICK ===
+            # Website (Thêm Tooltip)
             web_url = str(r['Website'] or "").strip()
             if web_url:
-                # Đảm bảo link có giao thức (http/https) để hệ điều hành hiểu
                 href_url = web_url if web_url.startswith('http') else 'http://' + web_url
-                
-                # Tạo một nhãn chứa mã HTML với thuộc tính màu xanh (#3498db) và gạch chân khi di chuột
                 lbl_web = QLabel(f'<a href="{href_url}" style="color: #3498db; text-decoration: none;">{web_url}</a>')
-                lbl_web.setOpenExternalLinks(True) # Chìa khóa để mở trình duyệt
+                lbl_web.setOpenExternalLinks(True) 
                 lbl_web.setAlignment(Qt.AlignmentFlag.AlignVCenter)
                 lbl_web.setStyleSheet("padding-left: 5px; background: transparent;")
+                lbl_web.setToolTip(web_url) # Tooltip cho link web
                 self.table.setCellWidget(i, 5, lbl_web)
             else:
                 self.table.setItem(i, 5, QTableWidgetItem(""))
-            # ===================================================
             
-            # --- XỬ LÝ BADGE TRẠNG THÁI ---
+            # Trạng thái
             tt_val = str(r.get('TrangThai', '1'))
             if tt_val == '1' or tt_val.lower() == 'true':
                 lbl_text = "Hiển thị"; color = "#2ecc71" 
@@ -134,7 +158,7 @@ class DonViWindow(QWidget):
             bc_layout.addWidget(lbl_badge)
             self.table.setCellWidget(i, 6, badge_container)
 
-            # --- CỘT THAO TÁC ---
+            # Thao tác
             btns = QWidget()
             btns.setStyleSheet("background: transparent; border: none;")
             l = QHBoxLayout(btns)
