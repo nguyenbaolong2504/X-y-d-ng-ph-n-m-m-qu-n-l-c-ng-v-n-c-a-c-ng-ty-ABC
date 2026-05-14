@@ -11,14 +11,26 @@ class LoginWindow(QWidget):
 
         self.setWindowTitle("Đăng nhập hệ thống")
 
-        self.resize(450,300)
+        self.resize(450, 300)
 
-        self.conn = pyodbc.connect( 
-            "DRIVER={ODBC Driver 17 for SQL Server};" 
-            "SERVER=localhost\\SQLEXPRESS;" 
-            "DATABASE=congtyadc;" 
-            "Trusted_Connection=yes;" 
+        # =====================================================
+        # CONNECT SQL
+        # =====================================================
+
+        self.conn = pyodbc.connect(
+
+            "DRIVER={ODBC Driver 17 for SQL Server};"
+
+            "SERVER=localhost\\SQLEXPRESS;"
+
+            "DATABASE=congtyadc;"
+
+            "Trusted_Connection=yes;"
         )
+
+        # =====================================================
+        # STYLE
+        # =====================================================
 
         self.setStyleSheet("""
 
@@ -45,9 +57,25 @@ class LoginWindow(QWidget):
                 font-weight:bold;
             }
 
+            QPushButton:hover{
+                background:#5a4fcf;
+            }
+
         """)
 
+        # =====================================================
+        # LAYOUT
+        # =====================================================
+
         layout = QVBoxLayout(self)
+
+        layout.setContentsMargins(40,40,40,40)
+
+        layout.setSpacing(15)
+
+        # =====================================================
+        # TITLE
+        # =====================================================
 
         title = QLabel("ĐĂNG NHẬP HỆ THỐNG")
 
@@ -62,11 +90,21 @@ class LoginWindow(QWidget):
 
         layout.addWidget(title)
 
+        # =====================================================
+        # USERNAME
+        # =====================================================
+
         self.txt_user = QLineEdit()
 
         self.txt_user.setPlaceholderText(
             "Tên đăng nhập"
         )
+
+        layout.addWidget(self.txt_user)
+
+        # =====================================================
+        # PASSWORD
+        # =====================================================
 
         self.txt_pass = QLineEdit()
 
@@ -78,9 +116,11 @@ class LoginWindow(QWidget):
             QLineEdit.EchoMode.Password
         )
 
-        layout.addWidget(self.txt_user)
-
         layout.addWidget(self.txt_pass)
+
+        # =====================================================
+        # BUTTON LOGIN
+        # =====================================================
 
         btn = QPushButton("Đăng nhập")
 
@@ -88,43 +128,112 @@ class LoginWindow(QWidget):
 
         layout.addWidget(btn)
 
+    # =========================================================
+    # LOGIN
+    # =========================================================
+
     def login(self):
 
-        user = self.txt_user.text()
+        user = self.txt_user.text().strip()
 
-        password = self.txt_pass.text()
+        password = self.txt_pass.text().strip()
+
+        # =====================================================
+        # VALIDATE
+        # =====================================================
+
+        if user == "" or password == "":
+
+            QMessageBox.warning(
+                self,
+                "Thông báo",
+                "Vui lòng nhập đầy đủ tài khoản và mật khẩu"
+            )
+
+            return
+
+        # =====================================================
+        # QUERY
+        # =====================================================
 
         cursor = self.conn.cursor()
 
-        cursor.execute("""
-            SELECT
-                HoTen,
-                VaiTro
-            FROM TaiKhoan
-            WHERE TenDangNhap=?
-            AND MatKhau=?
-        """,(user,password))
+        sql = """
 
-        data = cursor.fetchone()
+        SELECT *
 
-        if data:
+        FROM CanBo
 
-            self.hoten = data[0]
+        WHERE Username = ?
 
-            self.vaitro = data[1]
+        AND Password = ?
+
+        """
+
+        cursor.execute(sql, (user, password))
+
+        row = cursor.fetchone()
+
+        # =====================================================
+        # LOGIN SUCCESS
+        # =====================================================
+
+        if row:
+
+            self.user_id = row.Id
+
+            self.hoten = row.HoTen
+
+            # =================================================
+            # ADMIN
+            # =================================================
+
+            if row.IsAdmin == True:
+
+                self.vaitro = "Admin"
+
+            else:
+
+                # =============================================
+                # ROLE
+                # =============================================
+
+                if row.NhomQuyenId == 1:
+
+                    self.vaitro = "GiamDoc"
+
+                elif row.NhomQuyenId == 2:
+
+                    self.vaitro = "TruongPhong"
+
+                else:
+
+                    self.vaitro = "NhanVien"
 
             QMessageBox.information(
+
                 self,
-                "OK",
-                f"Xin chào {self.hoten}\nVai trò: {self.vaitro}"
+
+                "Đăng nhập thành công",
+
+                f"Xin chào {self.hoten}\n"
+
+                f"Vai trò: {self.vaitro}"
             )
 
             self.close()
 
+        # =====================================================
+        # LOGIN FAIL
+        # =====================================================
+
         else:
 
             QMessageBox.critical(
+
                 self,
+
                 "Lỗi",
+
                 "Sai tài khoản hoặc mật khẩu"
             )

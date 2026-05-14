@@ -1,200 +1,252 @@
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import Qt
+import pyodbc
 
 
 class QuanLyPhanQuyen(QWidget):
 
-    def __init__(self, parent=None):
+    def __init__(self):
 
-        super().__init__(parent)
+        super().__init__()
+
+        # =====================================================
+        # SQL
+        # =====================================================
+
+        self.conn = pyodbc.connect(
+
+            "DRIVER={ODBC Driver 17 for SQL Server};"
+
+            "SERVER=localhost\\SQLEXPRESS;"
+
+            "DATABASE=congtyadc;"
+
+            "Trusted_Connection=yes;"
+        )
+
+        # =====================================================
+        # LAYOUT
+        # =====================================================
+
+        layout = QVBoxLayout(self)
+
+        # =====================================================
+        # STYLE
+        # =====================================================
 
         self.setStyleSheet("""
-            QWidget{
-                background:#f5f6fa;
-                font-family:Segoe UI;
-            }
 
-            QLabel{
-                color:#2d3436;
-            }
+        QWidget{
+            background:#f5f6fa;
+            font-family:Segoe UI;
+        }
 
-            QFrame{
-                background:white;
-                border-radius:15px;
-                border:1px solid #dfe6e9;
-            }
+        QLabel{
+            color:#2d3436;
+        }
 
-            QListWidget{
-                background:white;
-                border:none;
-                font-size:15px;
-                padding:10px;
-            }
+        QFrame{
+            background:white;
+            border-radius:15px;
+        }
 
-            QListWidget::item{
-                padding:12px;
-            }
+        QPushButton{
+            background:#6c5ce7;
+            color:white;
+            border:none;
+            padding:10px 18px;
+            border-radius:10px;
+            font-size:14px;
+            font-weight:bold;
+        }
 
-            QListWidget::item:selected{
-                background:#6c5ce7;
-                color:white;
-                border-radius:8px;
-            }
+        QPushButton:hover{
+            background:#5848c2;
+        }
+
+        QLineEdit{
+            padding:10px;
+            border:1px solid #dcdde1;
+            border-radius:10px;
+            background:white;
+        }
+
+        QTableWidget{
+            background:white;
+            border:none;
+            border-radius:10px;
+            gridline-color:#ecf0f1;
+            font-size:13px;
+        }
+
+        QHeaderView::section{
+            background:#6c5ce7;
+            color:white;
+            padding:12px;
+            border:none;
+            font-weight:bold;
+        }
+
         """)
 
-        main_layout = QHBoxLayout(self)
-
         # =====================================================
-        # MENU LEFT
+        # TITLE
         # =====================================================
 
-        left_frame = QFrame()
+        title = QLabel("🔐 QUẢN LÝ PHÂN QUYỀN HỆ THỐNG")
 
-        left_frame.setFixedWidth(300)
+        title.setStyleSheet("""
 
-        left_layout = QVBoxLayout(left_frame)
-
-        title_menu = QLabel("QUẢN TRỊ HỆ THỐNG")
-
-        title_menu.setStyleSheet("""
-            font-size:22px;
+            font-size:28px;
             font-weight:bold;
             color:#6c5ce7;
             padding:15px;
+
         """)
 
-        left_layout.addWidget(title_menu)
+        layout.addWidget(title)
 
-        self.menu = QListWidget()
+        # =====================================================
+        # TOOLBAR
+        # =====================================================
 
-        self.menu.addItems([
-            "👤 Quản lý người dùng",
-            "🏢 Quản lý phòng ban",
-            "🔐 Quản lý quyền hạn",
-            "📁 Quản lý template",
-            "⚙️ Cấu hình workflow",
-            "📋 Audit log"
+        toolbar = QHBoxLayout()
+
+        self.txt_search = QLineEdit()
+
+        self.txt_search.setPlaceholderText(
+            "Nhập tên đăng nhập..."
+        )
+
+        btn_reload = QPushButton("🔄 Làm mới")
+
+        btn_reload.clicked.connect(self.load_data)
+
+        toolbar.addWidget(self.txt_search)
+
+        toolbar.addWidget(btn_reload)
+
+        layout.addLayout(toolbar)
+
+        # =====================================================
+        # TABLE
+        # =====================================================
+
+        self.table = QTableWidget()
+
+        self.table.setColumnCount(4)
+
+        self.table.setHorizontalHeaderLabels([
+
+            "Tên đăng nhập",
+
+            "Mật khẩu",
+
+            "Vai trò",
+
+            "Họ tên"
+
         ])
 
-        left_layout.addWidget(self.menu)
+        self.table.horizontalHeader().setStretchLastSection(True)
 
-        # =====================================================
-        # CONTENT RIGHT
-        # =====================================================
+        self.table.verticalHeader().setVisible(False)
 
-        right_frame = QFrame()
-
-        right_layout = QVBoxLayout(right_frame)
-
-        title = QLabel(
-            "9. Quản trị Hệ thống (Admin)"
+        self.table.setSelectionBehavior(
+            QTableWidget.SelectionBehavior.SelectRows
         )
 
-        title.setStyleSheet("""
-            font-size:28px;
-            font-weight:bold;
-            padding:10px;
+        self.table.setAlternatingRowColors(True)
+
+        layout.addWidget(self.table)
+
+        # =====================================================
+        # INFO PANEL
+        # =====================================================
+
+        info = QFrame()
+
+        info_layout = QVBoxLayout(info)
+
+        lbl = QLabel("""
+
+
+""")
+
+        lbl.setStyleSheet("""
+
+            font-size:16px;
+            line-height:30px;
+            padding:15px;
+
         """)
 
-        right_layout.addWidget(title)
+        info_layout.addWidget(lbl)
+
+        layout.addWidget(info)
 
         # =====================================================
-        # CHỨC NĂNG
+        # LOAD DATA
         # =====================================================
 
-        chucnang_title = QLabel(
-            "Chức năng chính:"
-        )
+        self.load_data()
 
-        chucnang_title.setStyleSheet("""
-            font-size:20px;
-            font-weight:bold;
-            padding-top:10px;
-        """)
+    # =========================================================
+    # LOAD DATA
+    # =========================================================
 
-        right_layout.addWidget(chucnang_title)
+    def load_data(self):
 
-        features = [
-            "• Quản lý người dùng, phòng ban",
-            "• Quản lý quyền hạn",
-            "• Quản lý template, danh mục",
-            "• Cấu hình workflow",
-            "• Audit log"
-        ]
+        cursor = self.conn.cursor()
 
-        for feature in features:
+        sql = """
 
-            label = QLabel(feature)
+        SELECT
 
-            label.setStyleSheet("""
-                font-size:18px;
-                padding:8px;
-            """)
+            Username,
 
-            right_layout.addWidget(label)
+            Password,
 
-        # =====================================================
-        # ACTOR
-        # =====================================================
+            CASE
 
-        actor_title = QLabel("Actor & Quyền:")
+                WHEN IsAdmin = 1 THEN N'Admin'
 
-        actor_title.setStyleSheet("""
-            font-size:20px;
-            font-weight:bold;
-            padding-top:20px;
-        """)
+                WHEN NhomQuyenId = 1 THEN N'Giám đốc'
 
-        right_layout.addWidget(actor_title)
+                WHEN NhomQuyenId = 2 THEN N'Trưởng phòng'
 
-        actors = [
-            ("Admin","Toàn quyền"),
-            ("Giám đốc","Xem và phê duyệt"),
-            ("Văn thư","Quản lý công văn"),
-            ("Nhân viên","Xem dữ liệu được cấp")
-        ]
+                ELSE N'Nhân viên'
 
-        for role,desc in actors:
+            END AS VaiTro,
 
-            card = QFrame()
+            HoTen
 
-            card.setStyleSheet("""
-                background:#ffffff;
-                border:1px solid #dfe6e9;
-                border-radius:12px;
-            """)
+        FROM CanBo
 
-            card_layout = QHBoxLayout(card)
+        WHERE Username IS NOT NULL
 
-            role_label = QLabel(role)
+        """
 
-            role_label.setStyleSheet("""
-                font-size:18px;
-                font-weight:bold;
-                color:#6c5ce7;
-            """)
+        keyword = self.txt_search.text().strip()
 
-            desc_label = QLabel(desc)
+        if keyword != "":
 
-            desc_label.setStyleSheet("""
-                font-size:16px;
-                color:#636e72;
-            """)
+            sql += " AND Username LIKE ? "
 
-            card_layout.addWidget(role_label)
+            cursor.execute(sql, ('%' + keyword + '%',))
 
-            card_layout.addStretch()
+        else:
 
-            card_layout.addWidget(desc_label)
+            cursor.execute(sql)
 
-            right_layout.addWidget(card)
+        data = cursor.fetchall()
 
-        right_layout.addStretch()
+        self.table.setRowCount(len(data))
 
-        # =====================================================
-        # ADD
-        # =====================================================
+        for row_idx, row_data in enumerate(data):
 
-        main_layout.addWidget(left_frame)
+            for col_idx, value in enumerate(row_data):
 
-        main_layout.addWidget(right_frame)
+                item = QTableWidgetItem(str(value))
+
+                self.table.setItem(row_idx, col_idx, item)

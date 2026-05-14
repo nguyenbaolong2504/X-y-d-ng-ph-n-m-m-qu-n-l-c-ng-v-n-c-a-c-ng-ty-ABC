@@ -377,7 +377,7 @@ class MainApp(QMainWindow):
             "⏳ Thời hạn bảo quản",
             "🏷️ Loại văn bản",
             "🏢 Đơn vị, bộ phận",
-            "⚙️ Xử lý công văn"
+            "⚙️ Xử lý công văn",
 
             "🔐 Phân quyền sử dụng",
             "🗂️ Mục lục hồ sơ",
@@ -806,11 +806,9 @@ if __name__ == "__main__":
     # ADMIN
     # =============================================================
 
-    if vaitro == "Admin":
+    if vaitro == "Admin": 
+        pass
 
-        window.setWindowTitle(
-            "HỆ THỐNG QUẢN LÝ VĂN BẢN - ADMIN"
-        )
 
     # =============================================================
     # GIÁM ĐỐC
