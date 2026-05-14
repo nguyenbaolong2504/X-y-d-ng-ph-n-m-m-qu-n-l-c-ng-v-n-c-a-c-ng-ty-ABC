@@ -10,7 +10,6 @@ class HanBaoQuanController:
         self.view.sua_signal.connect(self.handle_edit)
         self.view.xoa_signal.connect(self.handle_delete)
         
-        # --- KẾT NỐI SỰ KIỆN MỚI ---
         self.view.lam_moi_signal.connect(self.refresh_table)
         self.view.timkiem_signal.connect(self.handle_search)
         
