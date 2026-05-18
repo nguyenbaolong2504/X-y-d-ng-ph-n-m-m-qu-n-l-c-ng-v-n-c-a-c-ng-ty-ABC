@@ -138,10 +138,38 @@ class CongVanModel:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    INSERT INTO CongVanDen (Nam, SoDen, KyHieu, NgayDen, NgayKy, NoiPhatHanh,
-                                           TrichYeu, NoiNhan, NgayChuyen, GhiChu, FileDinhKem,
-                                           TrangThaiChuyen, PhanLoaiId)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO CongVanDen (
+                        Nam,
+                        SoDen,
+                        KyHieu,
+                        NgayDen,
+                        NgayKy,
+                        NoiPhatHanh,
+                        TrichYeu,
+                        NoiNhan,
+                        NgayChuyen,
+                        GhiChu,
+                        FileDinhKem,
+                        TrangThaiChuyen,
+                        PhanLoaiId,
+                        TrangThaiXuLy,
+                        TrangThaiDuyet,
+                        IsKhan,
+                        IsMat,
+                        DonViNhapId,
+                        NguoiTaoId
+                    )
+
+                    VALUES (
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        0,
+                        0,
+                        0,
+                        0,
+                        1,
+                        1
+                    )
+
                 """, (
                     data['ngay_den'][:4],
                     data.get('so_den'), data['so_ky_hieu'], data['ngay_den'], data['ngay_van_ban'],

@@ -12,7 +12,7 @@ def _intercept_connect(*args, **kwargs):
     # TRẢ VỀ LOCALHOST VÌ MÁY BẠN DÙNG TÊN NÀY MỚI CHẠY ĐƯỢC
     my_local_conn_str = (
         "DRIVER={ODBC Driver 17 for SQL Server};"
-        "SERVER=localhost;" 
+        "SERVER=localhost\\SQLEXPRESS;" 
         "DATABASE=congtyadc;"
         "Trusted_Connection=yes;"
     )
@@ -377,10 +377,7 @@ class MainApp(QMainWindow):
             "🏷️ Loại công văn",
             "🏢 Đơn vị, bộ phận",
             "⚙️ Xử lý công văn",
-<<<<<<< HEAD
 
-=======
->>>>>>> ed155324507f9f90cbee041c403a52b9796deacd
             "🔐 Phân quyền sử dụng",
             "🗂️ Mục lục hồ sơ",
             "📁 Danh mục hồ sơ",
