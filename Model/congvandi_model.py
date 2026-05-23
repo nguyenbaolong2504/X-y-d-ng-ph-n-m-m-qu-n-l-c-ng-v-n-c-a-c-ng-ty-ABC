@@ -1,4 +1,3 @@
-
 import pyodbc
 from typing import List, Dict
 from config import DB_CONFIG
@@ -27,43 +26,92 @@ class CongVanDiModel:
     # GET ALL
     # =====================================================
 
-    def get_all(self) -> List[Dict]:
+    def get_all(
+        self,
+        is_admin=False,
+        role=None,
+        ten_don_vi=None
+    ) -> List[Dict]:
 
-        with self._get_connection() as conn:
+        sql = """
 
-            cursor = conn.cursor()
+            SELECT 
+                Id,
+                SoPhatHanh,
+                Nam,
+                KyHieu,
+                NgayKy,
+                NoiNhan,
+                TrichYeu,
+                TrangThaiChuyen,
+                GhiChu,
+                FilePath
 
-            cursor.execute("""
+            FROM CongVanPhatHanh
 
-                SELECT 
-                    Id,
-                    SoPhatHanh,
-                    Nam,
-                    KyHieu,
-                    NgayKy,
-                    NoiNhan,
-                    TrichYeu,
-                    TrangThaiChuyen,
-                    GhiChu,
-                    FilePath
+        """
 
-                FROM CongVanPhatHanh
+        conditions = []
 
-                ORDER BY Id DESC
+        params = []
 
-            """)
+        if not is_admin:
 
-            rows = cursor.fetchall()
+            if role in ('TruongPhong', 'NhanVien'):
 
-            return [
-                dict(
-                    zip(
-                        [col[0] for col in cursor.description],
-                        row
-                    )
+                conditions.append(
+                    "NoiNhan = ?"
                 )
-                for row in rows
-            ]
+
+                params.append(
+                    ten_don_vi
+                )
+
+        if conditions:
+
+            sql += " WHERE " + " AND ".join(
+                conditions
+            )
+
+        sql += " ORDER BY Id DESC"
+
+        try:
+
+            with self._get_connection() as conn:
+
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    sql,
+                    params
+                )
+
+                rows = cursor.fetchall()
+
+                return [
+
+                    dict(
+
+                        zip(
+
+                            [col[0]
+                             for col in cursor.description],
+
+                            row
+
+                        )
+
+                    )
+
+                    for row in rows
+
+                ]
+
+        except Exception as e:
+
+            print(e)
+
+            return []
 
     # =====================================================
     # ADD
@@ -116,7 +164,6 @@ class CongVanDiModel:
                     ?,
                     ?
                 )
-
 
             """
 
@@ -216,15 +263,3 @@ class CongVanDiModel:
             """,(id,))
 
             conn.commit()
-
-    # =====================================================
-    # EXPORT
-    # =====================================================
-
-    def get_data_for_export(
-        self,
-        start_date=None,
-        end_date=None
-    ) -> List[Dict]:
-
-        return self.get_all()
