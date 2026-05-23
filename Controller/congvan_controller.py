@@ -5,9 +5,10 @@ from Utils.excel_export import export_to_excel
 
 
 class CongVanController:
-    def __init__(self, model: CongVanModel, view: MainWindow):
+    def __init__(self, model: CongVanModel, view: MainWindow, user_session):
         self.model = model
         self.view = view
+        self.user_session = user_session
         self.table_model = None
 
         self.view.them_cv_signal.connect(self.them_cong_van)
@@ -42,10 +43,13 @@ class CongVanController:
 
     def load_data(self):
         try:
-            data = self.model.get_all()
+            data = self.model.get_all(
+                is_admin=self.user_session.is_admin_user(),
+                role=self.user_session.get_role(),
+                ten_don_vi=self.user_session.get_ten_don_vi()
+            )
             self.table_model = CongVanTableModel(data, self.get_headers())
             self.view.set_table_model(self.table_model)
-            # Reset combobox lọc loại về "Tất cả"
             self.view.cb_loai_vb.setCurrentIndex(0)
             self.view.show_status(f"Đã tải {len(data)} công văn")
         except Exception as e:
@@ -55,14 +59,17 @@ class CongVanController:
         try:
             tu = self.view.date_tu_ngay.date().toString("yyyy-MM-dd")
             den = self.view.date_den_ngay.date().toString("yyyy-MM-dd")
-            loai_id = self.view.cb_loai_vb.currentData()   # None nếu là "Tất cả"
-
-            # Nếu checkbox "Bỏ qua ngày" được chọn, truyền None cho ngày
+            loai_id = self.view.cb_loai_vb.currentData()
             if self.view.chk_bo_qua_ngay.isChecked():
                 tu = None
                 den = None
 
-            data = self.model.filter_by_criteria(tu, den, loai_id)
+            data = self.model.filter_by_criteria(
+                tu, den, loai_id,
+                is_admin=self.user_session.is_admin_user(),
+                role=self.user_session.get_role(),
+                ten_don_vi=self.user_session.get_ten_don_vi()
+            )
             self.table_model = CongVanTableModel(data, self.get_headers())
             self.view.set_table_model(self.table_model)
             self.view.show_status(f"Lọc được {len(data)} mục")
@@ -74,7 +81,12 @@ class CongVanController:
             if not keyword.strip():
                 self.load_data()
                 return
-            data = self.model.search_by_author_or_number(keyword)
+            data = self.model.search_by_author_or_number(
+                keyword,
+                is_admin=self.user_session.is_admin_user(),
+                role=self.user_session.get_role(),
+                ten_don_vi=self.user_session.get_ten_don_vi()
+            )
             self.table_model = CongVanTableModel(data, self.get_headers())
             self.view.set_table_model(self.table_model)
             self.view.show_status(f"Tìm thấy {len(data)} kết quả")
