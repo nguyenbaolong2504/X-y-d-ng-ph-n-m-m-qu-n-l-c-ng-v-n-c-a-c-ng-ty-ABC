@@ -12,14 +12,25 @@ class CongVanDiModel:
     def _get_connection(self):
         return pyodbc.connect(self.conn_str)
 
-    def get_all(self) -> List[Dict]:
+    def get_all(self, is_admin=False, role=None, ten_don_vi=None) -> List[Dict]:
+        sql = """
+            SELECT Id, SoPhatHanh, Nam, KyHieu, NgayKy, 
+                   NoiNhan, TrichYeu, TrangThaiChuyen, GhiChu, FilePath
+            FROM CongVanPhatHanh
+        """
+        conditions = []
+        params = []
+        if not is_admin:
+            if role in ('TruongPhong', 'NhanVien'):
+                conditions.append("NoiNhan = ?")
+                params.append(ten_don_vi)
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
+        sql += " ORDER BY Id DESC"
+
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
-                SELECT Id, SoPhatHanh, Nam, KyHieu, NgayKy, 
-                       NoiNhan, TrichYeu, TrangThaiChuyen, GhiChu, FilePath
-                FROM CongVanPhatHanh ORDER BY Id DESC
-            """)
+            cursor.execute(sql, params)
             rows = cursor.fetchall()
             return [dict(zip([col[0] for col in cursor.description], row)) for row in rows]
 
@@ -54,16 +65,13 @@ class CongVanDiModel:
             ))
             conn.commit()
 
-    # --- 6. CHỨC NĂNG XÓA ---
     def delete(self, id: int):
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM CongVanPhatHanh WHERE Id = ?", (id,))
             conn.commit()
 
-    # --- 7. CHỨC NĂNG XUẤT EXCEL (Dùng chung kết quả get_all hoặc filter) ---
     def get_data_for_export(self, start_date=None, end_date=None) -> List[Dict]:
-        """Hàm này hỗ trợ lấy dữ liệu sạch để Controller xuất ra file Excel"""
         if start_date and end_date:
             return self.filter_by_date(start_date, end_date)
         return self.get_all()

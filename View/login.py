@@ -1,32 +1,28 @@
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import Qt
 import pyodbc
+from Utils.user_session import UserSession
 
 
 class LoginWindow(QWidget):
 
     def __init__(self):
-
         super().__init__()
-
         self.setWindowTitle("Đăng nhập hệ thống")
+        self.resize(450, 300)
 
-        self.resize(450,300)
-
-        self.conn = pyodbc.connect( 
-            "DRIVER={ODBC Driver 17 for SQL Server};" 
-            "SERVER=localhost\\SQLEXPRESS;" 
-            "DATABASE=congtyadc;" 
-            "Trusted_Connection=yes;" 
+        self.conn = pyodbc.connect(
+            "DRIVER={ODBC Driver 17 for SQL Server};"
+            "SERVER=localhost\\SQLEXPRESS;"
+            "DATABASE=congtyadc;"
+            "Trusted_Connection=yes;"
         )
 
         self.setStyleSheet("""
-
             QWidget{
                 background:#f5f6fa;
                 font-family:Segoe UI;
             }
-
             QLineEdit{
                 padding:12px;
                 border-radius:10px;
@@ -34,7 +30,6 @@ class LoginWindow(QWidget):
                 font-size:14px;
                 background:white;
             }
-
             QPushButton{
                 background:#6c5ce7;
                 color:white;
@@ -44,87 +39,74 @@ class LoginWindow(QWidget):
                 font-size:15px;
                 font-weight:bold;
             }
-
+            QPushButton:hover{
+                background:#5a4fcf;
+            }
         """)
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(40,40,40,40)
+        layout.setSpacing(15)
 
         title = QLabel("ĐĂNG NHẬP HỆ THỐNG")
-
-        title.setStyleSheet("""
-            font-size:28px;
-            font-weight:bold;
-            color:#6c5ce7;
-            padding:20px;
-        """)
-
+        title.setStyleSheet("font-size:28px; font-weight:bold; color:#6c5ce7; padding:20px;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
         layout.addWidget(title)
 
         self.txt_user = QLineEdit()
-
-        self.txt_user.setPlaceholderText(
-            "Tên đăng nhập"
-        )
-
-        self.txt_pass = QLineEdit()
-
-        self.txt_pass.setPlaceholderText(
-            "Mật khẩu"
-        )
-
-        self.txt_pass.setEchoMode(
-            QLineEdit.EchoMode.Password
-        )
-
+        self.txt_user.setPlaceholderText("Tên đăng nhập")
         layout.addWidget(self.txt_user)
 
+        self.txt_pass = QLineEdit()
+        self.txt_pass.setPlaceholderText("Mật khẩu")
+        self.txt_pass.setEchoMode(QLineEdit.EchoMode.Password)
         layout.addWidget(self.txt_pass)
 
         btn = QPushButton("Đăng nhập")
-
         btn.clicked.connect(self.login)
-
         layout.addWidget(btn)
 
     def login(self):
+        user = self.txt_user.text().strip()
+        password = self.txt_pass.text().strip()
 
-        user = self.txt_user.text()
-
-        password = self.txt_pass.text()
+        if user == "" or password == "":
+            QMessageBox.warning(self, "Thông báo", "Vui lòng nhập đầy đủ tài khoản và mật khẩu")
+            return
 
         cursor = self.conn.cursor()
+        sql = """
+            SELECT cb.Id, cb.HoTen, cb.IsAdmin, cb.DonViId, dv.TenDonVi, cb.NhomQuyenId
+            FROM CanBo cb
+            LEFT JOIN DonViTrucThuoc dv ON cb.DonViId = dv.Id
+            WHERE Username = ? AND Password = ?
+        """
+        cursor.execute(sql, (user, password))
+        row = cursor.fetchone()
 
-        cursor.execute("""
-            SELECT
-                HoTen,
-                VaiTro
-            FROM TaiKhoan
-            WHERE TenDangNhap=?
-            AND MatKhau=?
-        """,(user,password))
+        if row:
+            self.user_id = row[0]
+            self.hoten = row[1]
+            is_admin = row[2]
+            don_vi_id = row[3]
+            ten_don_vi = row[4] if row[4] else ""
+            nhom_quyen_id = row[5] if len(row) > 5 else None
 
-        data = cursor.fetchone()
+            if is_admin:
+                self.vaitro = "Admin"
+            else:
+                if nhom_quyen_id == 1:
+                    self.vaitro = "GiamDoc"
+                elif nhom_quyen_id == 2:
+                    self.vaitro = "TruongPhong"
+                else:
+                    self.vaitro = "NhanVien"
 
-        if data:
+            session = UserSession()
+            # SỬA DÒNG NÀY: thêm self.hoten vào vị trí thứ 3
+            session.set_user(self.user_id, user, self.hoten, don_vi_id, is_admin, self.vaitro, ten_don_vi)
 
-            self.hoten = data[0]
-
-            self.vaitro = data[1]
-
-            QMessageBox.information(
-                self,
-                "OK",
-                f"Xin chào {self.hoten}\nVai trò: {self.vaitro}"
-            )
-
+            QMessageBox.information(self, "Đăng nhập thành công", f"Xin chào {self.hoten}\nVai trò: {self.vaitro}")
             self.close()
-
         else:
-
-            QMessageBox.critical(
-                self,
-                "Lỗi",
-                "Sai tài khoản hoặc mật khẩu"
-            )
+            QMessageBox.critical(self, "Lỗi", "Sai tài khoản hoặc mật khẩu")
