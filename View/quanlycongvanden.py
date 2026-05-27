@@ -4,8 +4,8 @@ from PyQt6.QtWidgets import *
 from PyQt6.QtCore import QDate, pyqtSignal, Qt, QUrl
 from PyQt6.QtGui import QDesktopServices
 
-
 class MainWindow(QMainWindow):
+    # --- CÁC SIGNAL KẾT NỐI VỚI CONTROLLER ---
     them_cv_signal = pyqtSignal(dict)
     sua_cv_signal = pyqtSignal(int, dict)
     xoa_cv_signal = pyqtSignal(int)
@@ -13,14 +13,15 @@ class MainWindow(QMainWindow):
     loc_cv_signal = pyqtSignal()
     xuat_excel_signal = pyqtSignal()
     nap_dulieu_signal = pyqtSignal()
+    giao_viec_signal = pyqtSignal(int) 
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Hệ thống Quản lý Công văn - Công ty ABC")
+        self.setWindowTitle("Hệ thống Quản lý Văn bản Đến & Phân công")
         self.setGeometry(80, 80, 1720, 900)
 
-        self.ds_phong_ban = []
-        self.ds_loai_van_ban = []          # list dict: {'id':..., 'ten_loai':...}
+        self.ds_nhan_su = [] 
+        self.ds_loai_van_ban = []
         self._them_file_path = None
         self._sua_file_path = None
         self._sua_old_file = None
@@ -34,55 +35,50 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(12, 12, 12, 12)
         main_layout.setSpacing(10)
 
-        # Header
-        header = QLabel("📋 DANH MỤC VĂN BẢN ĐẾN")
+        header = QLabel("📋 QUẢN LÝ VĂN BẢN ĐẾN & PHÂN CÔNG")
         header.setStyleSheet("""
-            font-size: 20px; 
-            font-weight: bold; 
-            padding: 12px; 
-            background-color: #f0f2f5; 
-            border-radius: 6px;
-            color: #1e3a8a;
+            font-size: 20px; font-weight: bold; padding: 12px; 
+            background-color: #f0f2f5; border-radius: 6px; color: #1e3a8a;
         """)
         main_layout.addWidget(header)
 
-        # Toolbar
         toolbar = QHBoxLayout()
         self.btn_them = QPushButton("➕ Thêm mới")
         self.btn_them.setStyleSheet("background-color: #28a745; color: white; font-weight: bold; padding: 9px 18px; border-radius: 5px;")
+        
+        self.btn_giao_viec = QPushButton("👤 Phân công / Chuyển")
+        self.btn_giao_viec.setStyleSheet("background-color: #fd7e14; color: white; font-weight: bold; padding: 9px 18px; border-radius: 5px;")
+        
         self.btn_xoa = QPushButton("❌ Xóa")
         self.btn_xoa.setStyleSheet("background-color: #dc3545; color: white; font-weight: bold; padding: 9px 18px; border-radius: 5px;")
+        
         self.btn_refresh = QPushButton("🔄 Làm mới")
         self.btn_excel = QPushButton("📊 Xuất Excel")
-        self.btn_in = QPushButton("🖨️ In")
-        for btn in [self.btn_them, self.btn_xoa, self.btn_refresh, self.btn_excel, self.btn_in]:
+        
+        for btn in [self.btn_them, self.btn_giao_viec, self.btn_xoa, self.btn_refresh, self.btn_excel]:
             toolbar.addWidget(btn)
 
         toolbar.addStretch()
-
-            # Trong setup_ui, thay thế phần BỘ LỌC LOẠI VĂN BẢN bằng:
-        # ---- BỘ LỌC LOẠI VĂN BẢN ----
         toolbar.addWidget(QLabel("Loại VB:"))
         self.cb_loai_vb = QComboBox()
         self.cb_loai_vb.addItem("Tất cả", None)
-
-        # THÊM CHECKBOX BỎ QUA NGÀY
+        
         self.chk_bo_qua_ngay = QCheckBox("Bỏ qua ngày")
-        self.chk_bo_qua_ngay.setChecked(True)  # mặc định bỏ qua
+        self.chk_bo_qua_ngay.setChecked(True)
         toolbar.addWidget(self.chk_bo_qua_ngay)
-
         self.cb_loai_vb.currentIndexChanged.connect(self.loc_cv_signal.emit)
         toolbar.addWidget(self.cb_loai_vb)
         toolbar.addSpacing(25)
 
-        # ---- BỘ LỌC NGÀY (giữ nguyên) ----
         toolbar.addWidget(QLabel("Từ ngày:"))
         self.date_tu_ngay = QDateEdit(calendarPopup=True)
+        self.date_tu_ngay.setDisplayFormat("dd/MM/yyyy")
         self.date_tu_ngay.setDate(QDate.currentDate().addDays(-30))
         toolbar.addWidget(self.date_tu_ngay)
 
         toolbar.addWidget(QLabel("đến ngày:"))
         self.date_den_ngay = QDateEdit(calendarPopup=True)
+        self.date_den_ngay.setDisplayFormat("dd/MM/yyyy")
         self.date_den_ngay.setDate(QDate.currentDate())
         toolbar.addWidget(self.date_den_ngay)
 
@@ -91,7 +87,6 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(self.btn_loc)
         main_layout.addLayout(toolbar)
 
-        # Search bar
         search_layout = QHBoxLayout()
         self.lbl_count = QLabel("Đang xem: 0 mục")
         self.lbl_count.setStyleSheet("font-weight: bold; color: #1e3a8a;")
@@ -106,7 +101,6 @@ class MainWindow(QMainWindow):
         search_layout.addWidget(self.btn_search)
         main_layout.addLayout(search_layout)
 
-        # Table
         self.table_view = QTableView()
         self.table_view.setAlternatingRowColors(True)
         self.table_view.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
@@ -114,21 +108,16 @@ class MainWindow(QMainWindow):
         self.table_view.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table_view.setStyleSheet("""
             QTableView { gridline-color: #d0d7e3; font-size: 13px; }
-            QHeaderView::section { 
-                background-color: #e9ecef; 
-                font-weight: bold; 
-                padding: 8px; 
-                border: 1px solid #c0c4cc;
-            }
+            QHeaderView::section { background-color: #e9ecef; font-weight: bold; padding: 8px; border: 1px solid #c0c4cc; }
         """)
         main_layout.addWidget(self.table_view)
 
-        # Signals
+        # Connect signals
         self.btn_them.clicked.connect(self.open_them_dialog)
+        self.btn_giao_viec.clicked.connect(self.open_giao_viec_dialog) 
         self.btn_xoa.clicked.connect(self.confirm_delete)
         self.btn_refresh.clicked.connect(self.nap_dulieu_signal.emit)
         self.btn_excel.clicked.connect(self.xuat_excel_signal.emit)
-        self.btn_in.clicked.connect(self.print_table)
         self.btn_search.clicked.connect(self.handle_search)
         self.search_input.returnPressed.connect(self.handle_search)
         self.btn_loc.clicked.connect(self.loc_cv_signal.emit)
@@ -136,28 +125,31 @@ class MainWindow(QMainWindow):
         self.table_view.clicked.connect(self.on_table_click)
 
     def handle_search(self):
-        keyword = self.search_input.text().strip()
-        self.tim_kiem_signal.emit(keyword)
+        self.tim_kiem_signal.emit(self.search_input.text().strip())
 
     def set_table_model(self, model):
         self.table_view.setModel(model)
-        widths = [40, 70, 100, 85, 170, 135, 100, 340, 180, 100, 110, 90, 120, 160]
+        self.table_view.setColumnHidden(0, True) 
+        widths = [0, 50, 100, 100, 170, 135, 100, 340, 180, 100, 110, 120, 160] 
         for i, w in enumerate(widths):
             if i < model.columnCount():
                 self.table_view.setColumnWidth(i, w)
         self.lbl_count.setText(f"Đang xem: {model.rowCount()} mục")
 
-    def set_phong_ban_list(self, ds):
-        self.ds_phong_ban = ds or []
+    def set_nhan_su_list(self, ds):
+        self.ds_nhan_su = ds or []
 
+    # 🟢 FIX: Dùng bộ lọc key an toàn chống crash
     def set_loai_van_ban_list(self, ds):
-        """Nhận list dict: [{'id':..., 'ten_loai':...}], nạp vào combobox lọc"""
         self.ds_loai_van_ban = ds or []
         self.cb_loai_vb.blockSignals(True)
         self.cb_loai_vb.clear()
         self.cb_loai_vb.addItem("Tất cả", None)
         for item in self.ds_loai_van_ban:
-            self.cb_loai_vb.addItem(item['ten_loai'], item['id'])
+            # Dùng get an toàn cho cả ten_loai, ten, hoặc TenLoai
+            ten = item.get('ten_loai') or item.get('ten') or item.get('TenLoai') or "Chưa rõ"
+            id_val = item.get('id') or item.get('Id')
+            self.cb_loai_vb.addItem(ten, id_val)
         self.cb_loai_vb.blockSignals(False)
 
     def show_status(self, msg: str):
@@ -166,11 +158,6 @@ class MainWindow(QMainWindow):
     def show_error(self, msg: str):
         QMessageBox.critical(self, "Lỗi", msg)
 
-    def print_table(self):
-        QMessageBox.information(self, "Thông báo", 
-            "Chức năng In đang được phát triển.\nBạn có thể dùng nút **Xuất Excel** tạm thời.")
-
-    # ================== CHỌN FILE ==================
     def _chon_file(self, line_edit: QLineEdit, mode: str):
         file_path, _ = QFileDialog.getOpenFileName(self, "Chọn file đính kèm", "", "All Files (*.*)")
         if file_path:
@@ -191,45 +178,61 @@ class MainWindow(QMainWindow):
         self.sua_file_edit.clear()
         self.sua_file_edit.setPlaceholderText("Đã xóa file")
 
-    # ================== FORM THÊM ==================
+    def open_giao_viec_dialog(self):
+        index = self.table_view.currentIndex()
+        if not index.isValid():
+            QMessageBox.warning(self, "Cảnh báo", "Vui lòng chọn một văn bản để phân công!")
+            return
+        row_data = self.table_view.model().get_row(index.row())
+        self.giao_viec_signal.emit(row_data["id"])
+
     def open_them_dialog(self):
         dialog = QDialog(self)
-        dialog.setWindowTitle("Thêm Công văn Đến Mới")
+        dialog.setWindowTitle("Tiếp nhận Công văn Đến")
         dialog.setFixedWidth(680)
         layout = QVBoxLayout(dialog)
         form = QFormLayout()
         form.setSpacing(12)
         style = "padding: 6px 8px; border: 1px solid #b0b0b0; border-radius: 4px;"
 
-        # Combo Loại văn bản
         loai_vb_cb = QComboBox()
+        # 🟢 FIX: Dùng key an toàn cho ComboBox Thêm
         for item in self.ds_loai_van_ban:
-            loai_vb_cb.addItem(item['ten_loai'], item['id'])
+            ten = item.get('ten_loai') or item.get('ten') or item.get('TenLoai') or "Chưa rõ"
+            id_val = item.get('id') or item.get('Id')
+            loai_vb_cb.addItem(ten, id_val)
 
-        # Trạng thái
         trang_thai_cb = QComboBox()
-        trang_thai_cb.addItems(["Mới", "Đang xử lý", "Hoàn thành"])
+        trang_thai_cb.addItems(["Mới tiếp nhận", "Chờ sếp phân công", "Đang xử lý", "Hoàn thành"])
+
+        muc_do_cb = QComboBox()
+        muc_do_cb.addItems(["Thường", "Khẩn", "Hỏa tốc"])
 
         inputs = {
             "ngay_den": QDateEdit(calendarPopup=True, date=QDate.currentDate()),
-            "so_den": QLineEdit(),
             "tac_gia": QLineEdit(),
             "so_ky_hieu": QLineEdit(),
             "ngay_van_ban": QDateEdit(calendarPopup=True, date=QDate.currentDate()),
+            "han_xu_ly": QDateEdit(calendarPopup=True, date=QDate.currentDate().addDays(7)),
             "trich_yeu": QTextEdit(),
-            "don_vi_nhan": QComboBox(),
-            "ngay_chuyen": QDateEdit(calendarPopup=True, date=QDate.currentDate()),
+            "nguoi_xu_ly": QComboBox(), 
             "ghi_chu": QLineEdit()
         }
-        inputs["don_vi_nhan"].addItems(self.ds_phong_ban)
-        inputs["don_vi_nhan"].setEditable(True)
+        
+        inputs["ngay_den"].setDisplayFormat("dd/MM/yyyy")
+        inputs["ngay_van_ban"].setDisplayFormat("dd/MM/yyyy")
+        inputs["han_xu_ly"].setDisplayFormat("dd/MM/yyyy")
+        
+        inputs["nguoi_xu_ly"].addItem("-- Chưa phân công --", None)
+        for ns in self.ds_nhan_su:
+            ten_nv = ns.get('ho_ten', ns.get('ten', ''))
+            inputs["nguoi_xu_ly"].addItem(ten_nv, ns['id'])
 
-        for w in inputs.values():
+        for key, w in inputs.items():
             if isinstance(w, (QLineEdit, QTextEdit)):
                 w.setStyleSheet(style)
         inputs["trich_yeu"].setFixedHeight(80)
 
-        # File
         file_layout = QHBoxLayout()
         self.them_file_edit = QLineEdit()
         self.them_file_edit.setReadOnly(True)
@@ -239,18 +242,18 @@ class MainWindow(QMainWindow):
         file_layout.addWidget(self.them_file_edit)
         file_layout.addWidget(btn_file)
 
-        form.addRow("Ngày đến (*):", inputs["ngay_den"])
-        form.addRow("Số đến:", inputs["so_den"])
-        form.addRow("Tác giả / Cơ quan (*):", inputs["tac_gia"])
+        form.addRow("Ngày nhận (*):", inputs["ngay_den"])
+        form.addRow("Nơi gửi / Tác giả (*):", inputs["tac_gia"])
         form.addRow("Số ký hiệu (*):", inputs["so_ky_hieu"])
-        form.addRow("Ngày văn bản:", inputs["ngay_van_ban"])
+        form.addRow("Ngày trên văn bản:", inputs["ngay_van_ban"])
+        form.addRow("Hạn xử lý (Deadline):", inputs["han_xu_ly"])
         form.addRow("Trích yếu nội dung:", inputs["trich_yeu"])
         form.addRow("Loại văn bản:", loai_vb_cb)
         form.addRow("Trạng thái:", trang_thai_cb)
-        form.addRow("Đơn vị nhận:", inputs["don_vi_nhan"])
-        form.addRow("Ngày chuyển:", inputs["ngay_chuyen"])
+        form.addRow("Mức độ:", muc_do_cb)
+        form.addRow("Đơn vị/Người chủ trì:", inputs["nguoi_xu_ly"])
         form.addRow("File đính kèm:", file_layout)
-        form.addRow("Ghi chú:", inputs["ghi_chu"])
+        form.addRow("Ghi chú thêm:", inputs["ghi_chu"])
 
         layout.addLayout(form)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -260,103 +263,120 @@ class MainWindow(QMainWindow):
 
         if dialog.exec() == QDialog.DialogCode.Accepted:
             if not inputs["tac_gia"].text().strip() or not inputs["so_ky_hieu"].text().strip():
-                QMessageBox.warning(self, "Thiếu thông tin", "Vui lòng nhập đầy đủ Tác giả và Số ký hiệu!")
+                QMessageBox.warning(self, "Thiếu thông tin", "Vui lòng nhập đầy đủ Nơi gửi và Số ký hiệu!")
                 return
 
-            map_tt = {"Mới": 0, "Đang xử lý": 1, "Hoàn thành": 2}
+            map_tt = {"Mới tiếp nhận": 0, "Chờ sếp phân công": 1, "Đang xử lý": 2, "Hoàn thành": 3}
             data = {
                 "ngay_den": inputs["ngay_den"].date().toString("yyyy-MM-dd"),
-                "so_den": inputs["so_den"].text().strip(),
                 "tac_gia": inputs["tac_gia"].text().strip(),
                 "so_ky_hieu": inputs["so_ky_hieu"].text().strip(),
                 "ngay_van_ban": inputs["ngay_van_ban"].date().toString("yyyy-MM-dd"),
+                "han_xu_ly": inputs["han_xu_ly"].date().toString("yyyy-MM-dd"),
                 "trich_yeu": inputs["trich_yeu"].toPlainText().strip(),
                 "phan_loai_id": loai_vb_cb.currentData(),
                 "trang_thai": map_tt.get(trang_thai_cb.currentText(), 0),
-                "don_vi_nhan": inputs["don_vi_nhan"].currentText().strip(),
-                "ngay_chuyen": inputs["ngay_chuyen"].date().toString("yyyy-MM-dd"),
+                "muc_do": muc_do_cb.currentText(),
+                "nguoi_xu_ly": inputs["nguoi_xu_ly"].currentData(), 
                 "ghi_chu": inputs["ghi_chu"].text().strip(),
                 "file_dinh_kem": self._them_file_path
             }
             self.them_cv_signal.emit(data)
 
-    # ================== FORM SỬA ==================
     def open_sua_dialog(self):
         index = self.table_view.currentIndex()
-        if not index.isValid():
-            return
+        if not index.isValid(): return
         row_data = self.table_view.model().get_row(index.row())
-        if not row_data:
-            return
+        if not row_data: return
 
         dialog = QDialog(self)
-        dialog.setWindowTitle(f"Chỉnh sửa Công văn - ID: {row_data.get('id')}")
+        dialog.setWindowTitle(f"Chỉnh sửa Văn bản - ID: {row_data.get('id')}")
         dialog.setFixedWidth(680)
         layout = QVBoxLayout(dialog)
         form = QFormLayout()
         form.setSpacing(12)
         style = "padding: 6px 8px; border: 1px solid #b0b0b0; border-radius: 4px;"
 
-        # Loại văn bản
         loai_vb_cb = QComboBox()
+        # 🟢 FIX: Dùng key an toàn cho ComboBox Sửa
         for item in self.ds_loai_van_ban:
-            loai_vb_cb.addItem(item['ten_loai'], item['id'])
-        current_id = row_data.get("phan_loai_id")
-        idx = loai_vb_cb.findData(current_id)
-        if idx >= 0:
-            loai_vb_cb.setCurrentIndex(idx)
+            ten = item.get('ten_loai') or item.get('ten') or item.get('TenLoai') or "Chưa rõ"
+            id_val = item.get('id') or item.get('Id')
+            loai_vb_cb.addItem(ten, id_val)
+            
+        phan_loai_id = row_data.get("phan_loai_id")
+        if phan_loai_id is not None:
+            for i in range(loai_vb_cb.count()):
+                if str(loai_vb_cb.itemData(i)) == str(phan_loai_id):
+                    loai_vb_cb.setCurrentIndex(i)
+                    break
 
-        # Trạng thái
         trang_thai_cb = QComboBox()
-        trang_thai_cb.addItems(["Mới", "Đang xử lý", "Hoàn thành"])
-        map_tt = {0: "Mới", 1: "Đang xử lý", 2: "Hoàn thành"}
-        trang_thai_cb.setCurrentText(map_tt.get(row_data.get("trang_thai"), "Mới"))
+        trang_thai_cb.addItems(["Mới tiếp nhận", "Chờ sếp phân công", "Đang xử lý", "Hoàn thành"])
+        map_tt = {0: "Mới tiếp nhận", 1: "Chờ sếp phân công", 2: "Đang xử lý", 3: "Hoàn thành"}
+        trang_thai_cb.setCurrentText(map_tt.get(row_data.get("trang_thai"), "Mới tiếp nhận"))
+
+        muc_do_cb = QComboBox()
+        muc_do_cb.addItems(["Thường", "Khẩn", "Hỏa tốc"])
+        idx_muc = muc_do_cb.findText(row_data.get("muc_do", "Thường"))
+        if idx_muc >= 0: muc_do_cb.setCurrentIndex(idx_muc)
 
         inputs = {
             "ngay_den": QDateEdit(calendarPopup=True),
-            "so_den": QLineEdit(str(row_data.get("so_den", ""))),
             "tac_gia": QLineEdit(str(row_data.get("tac_gia", ""))),
             "so_ky_hieu": QLineEdit(str(row_data.get("so_ky_hieu", ""))),
             "ngay_van_ban": QDateEdit(calendarPopup=True),
+            "han_xu_ly": QDateEdit(calendarPopup=True),
             "trich_yeu": QTextEdit(str(row_data.get("trich_yeu", ""))),
-            "don_vi_nhan": QComboBox(),
-            "ngay_chuyen": QDateEdit(calendarPopup=True),
+            "nguoi_xu_ly": QComboBox(),
             "ghi_chu": QLineEdit(str(row_data.get("ghi_chu", "")))
         }
 
+        inputs["ngay_den"].setDisplayFormat("dd/MM/yyyy")
+        inputs["ngay_van_ban"].setDisplayFormat("dd/MM/yyyy")
+        inputs["han_xu_ly"].setDisplayFormat("dd/MM/yyyy")
+
         def set_date(widget, value):
             if value:
-                try:
-                    widget.setDate(QDate.fromString(str(value).split()[0], "yyyy-MM-dd"))
-                except:
-                    widget.setDate(QDate.currentDate())
-            else:
-                widget.setDate(QDate.currentDate())
+                try: widget.setDate(QDate.fromString(str(value).split()[0], "yyyy-MM-dd"))
+                except: widget.setDate(QDate.currentDate())
+            else: widget.setDate(QDate.currentDate())
 
         set_date(inputs["ngay_den"], row_data.get("ngay_den"))
         set_date(inputs["ngay_van_ban"], row_data.get("ngay_van_ban"))
-        set_date(inputs["ngay_chuyen"], row_data.get("ngay_chuyen"))
+        set_date(inputs["han_xu_ly"], row_data.get("han_xu_ly"))
 
-        inputs["don_vi_nhan"].addItems(self.ds_phong_ban)
-        inputs["don_vi_nhan"].setEditable(True)
-        inputs["don_vi_nhan"].setCurrentText(str(row_data.get("don_vi_nhan", "")))
+        inputs["nguoi_xu_ly"].addItem("-- Chưa phân công --", None)
+        for ns in self.ds_nhan_su:
+            ten_nv = ns.get('ho_ten', ns.get('ten', ''))
+            inputs["nguoi_xu_ly"].addItem(ten_nv, ns['id'])
+            
+        nguoi_xu_ly_cu = row_data.get("nguoi_xu_ly") 
+        if nguoi_xu_ly_cu is not None:
+            found = False
+            for i in range(inputs["nguoi_xu_ly"].count()):
+                if str(inputs["nguoi_xu_ly"].itemData(i)) == str(nguoi_xu_ly_cu):
+                    inputs["nguoi_xu_ly"].setCurrentIndex(i)
+                    found = True
+                    break
+            if not found:
+                idx_text = inputs["nguoi_xu_ly"].findText(str(nguoi_xu_ly_cu))
+                if idx_text >= 0:
+                    inputs["nguoi_xu_ly"].setCurrentIndex(idx_text)
 
         for w in inputs.values():
-            if isinstance(w, (QLineEdit, QTextEdit)):
-                w.setStyleSheet(style)
+            if isinstance(w, (QLineEdit, QTextEdit)): w.setStyleSheet(style)
         inputs["trich_yeu"].setFixedHeight(80)
 
-        # File
         file_layout = QHBoxLayout()
         self.sua_file_edit = QLineEdit()
         self.sua_file_edit.setReadOnly(True)
         old_file = row_data.get("file_dinh_kem")
         self._sua_old_file = old_file
         self._sua_file_path = old_file
-        if old_file:
-            self.sua_file_edit.setText(os.path.basename(old_file))
-        else:
-            self.sua_file_edit.setPlaceholderText("Không có file")
+        if old_file: self.sua_file_edit.setText(os.path.basename(old_file))
+        else: self.sua_file_edit.setPlaceholderText("Không có file")
+        
         btn_chon = QPushButton("📎 Chọn file")
         btn_xoa_file = QPushButton("Xóa file")
         btn_chon.clicked.connect(lambda: self._chon_file(self.sua_file_edit, 'sua'))
@@ -365,18 +385,18 @@ class MainWindow(QMainWindow):
         file_layout.addWidget(btn_chon)
         file_layout.addWidget(btn_xoa_file)
 
-        form.addRow("Ngày đến:", inputs["ngay_den"])
-        form.addRow("Số đến:", inputs["so_den"])
-        form.addRow("Tác giả / Cơ quan:", inputs["tac_gia"])
+        form.addRow("Ngày nhận:", inputs["ngay_den"])
+        form.addRow("Nơi gửi / Tác giả:", inputs["tac_gia"])
         form.addRow("Số ký hiệu:", inputs["so_ky_hieu"])
-        form.addRow("Ngày văn bản:", inputs["ngay_van_ban"])
-        form.addRow("Trích yếu:", inputs["trich_yeu"])
+        form.addRow("Ngày trên văn bản:", inputs["ngay_van_ban"])
+        form.addRow("Hạn xử lý (Deadline):", inputs["han_xu_ly"])
+        form.addRow("Trích yếu nội dung:", inputs["trich_yeu"])
         form.addRow("Loại văn bản:", loai_vb_cb)
         form.addRow("Trạng thái:", trang_thai_cb)
-        form.addRow("Đơn vị nhận:", inputs["don_vi_nhan"])
-        form.addRow("Ngày chuyển:", inputs["ngay_chuyen"])
+        form.addRow("Mức độ:", muc_do_cb)
+        form.addRow("Đơn vị/Người chủ trì:", inputs["nguoi_xu_ly"])
         form.addRow("File đính kèm:", file_layout)
-        form.addRow("Ghi chú:", inputs["ghi_chu"])
+        form.addRow("Ghi chú thêm:", inputs["ghi_chu"])
 
         layout.addLayout(form)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -386,23 +406,21 @@ class MainWindow(QMainWindow):
 
         if dialog.exec() == QDialog.DialogCode.Accepted:
             if self._sua_file_path != self._sua_old_file and self._sua_old_file and os.path.exists(self._sua_old_file):
-                try:
-                    os.remove(self._sua_old_file)
-                except:
-                    pass
+                try: os.remove(self._sua_old_file)
+                except: pass
 
-            map_tt_reverse = {"Mới": 0, "Đang xử lý": 1, "Hoàn thành": 2}
+            map_tt_reverse = {"Mới tiếp nhận": 0, "Chờ sếp phân công": 1, "Đang xử lý": 2, "Hoàn thành": 3}
             new_data = {
                 "ngay_den": inputs["ngay_den"].date().toString("yyyy-MM-dd"),
-                "so_den": inputs["so_den"].text().strip(),
                 "tac_gia": inputs["tac_gia"].text().strip(),
                 "so_ky_hieu": inputs["so_ky_hieu"].text().strip(),
                 "ngay_van_ban": inputs["ngay_van_ban"].date().toString("yyyy-MM-dd"),
+                "han_xu_ly": inputs["han_xu_ly"].date().toString("yyyy-MM-dd"),
                 "trich_yeu": inputs["trich_yeu"].toPlainText().strip(),
                 "phan_loai_id": loai_vb_cb.currentData(),
                 "trang_thai": map_tt_reverse.get(trang_thai_cb.currentText(), 0),
-                "don_vi_nhan": inputs["don_vi_nhan"].currentText().strip(),
-                "ngay_chuyen": inputs["ngay_chuyen"].date().toString("yyyy-MM-dd"),
+                "muc_do": muc_do_cb.currentText(),
+                "nguoi_xu_ly": inputs["nguoi_xu_ly"].currentData(),
                 "ghi_chu": inputs["ghi_chu"].text().strip(),
                 "file_dinh_kem": self._sua_file_path
             }
@@ -419,16 +437,9 @@ class MainWindow(QMainWindow):
             self.xoa_cv_signal.emit(row_data["id"])
 
     def on_table_click(self, index):
-        if index.column() != 12:   # cột File
-            return
         model = self.table_view.model()
-        if not model:
-            return
+        if not model: return
         file_path = model.data(index, Qt.ItemDataRole.UserRole)
-        if file_path and os.path.exists(file_path):
-            try:
-                QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath(file_path)))
-            except Exception as e:
-                self.show_error(f"Không thể mở file: {str(e)}")
-        else:
-            QMessageBox.warning(self, "Thông báo", "Không tìm thấy file đính kèm!")
+        if file_path and isinstance(file_path, str) and os.path.exists(file_path):
+            try: QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath(file_path)))
+            except Exception as e: self.show_error(f"Không thể mở file: {str(e)}")

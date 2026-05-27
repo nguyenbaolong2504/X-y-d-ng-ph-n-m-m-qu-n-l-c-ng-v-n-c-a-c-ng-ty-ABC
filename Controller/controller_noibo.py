@@ -5,11 +5,18 @@ class ControllerNoiBo:
     def __init__(self, model: ModelNoiBo, view):
         self.model = model
         self.view = view
+        self.view.set_model(model)
         self.connect_signals()
+        self.load_danh_muc()
         self.load_data()
-        
+
+    def load_danh_muc(self):
+        loai = self.model.get_loai_list()
+        donvi = self.model.get_donvi_list()
+        canbo = self.model.get_canbo_list()
+        self.view.set_danh_muc(loai, donvi, canbo)
+
     def connect_signals(self):
-        # Kết nối các tín hiệu từ giao diện người dùng
         self.view.them_cv_signal.connect(self.handle_them)
         self.view.sua_cv_signal.connect(self.handle_sua)
         self.view.xoa_cv_signal.connect(self.handle_xoa)
@@ -19,20 +26,17 @@ class ControllerNoiBo:
 
     def load_data(self, keyword=""):
         try:
-            # Lấy dữ liệu thực từ SQL Server qua Model
             data = self.model.get_all(keyword)
-            # Khởi tạo lại Model hiển thị bảng
             self.table_model = NoiBoTableModel(data)
-            # Cập nhật model vào View (TableView)
             self.view.set_table_model(self.table_model)
-            self.view.show_status(f"Hệ thống: Đã tải {len(data)} văn bản nội bộ.")
+            self.view.show_status(f"Đã tải {len(data)} văn bản nội bộ.")
         except Exception as e:
-            print(f"Lỗi Load Data: {e}") # Debug log
             self.view.show_error(f"Lỗi tải dữ liệu: {str(e)}")
 
     def handle_them(self, data):
         try:
-            self.model.add(data)
+            nguoi_tao_id = 1  # Sau này thay bằng user_session.user_id
+            self.model.add(data, nguoi_tao_id)
             self.load_data()
             self.view.show_status("Thêm thành công!")
         except Exception as e:
@@ -59,6 +63,3 @@ class ControllerNoiBo:
 
     def handle_xuat_excel(self):
         QMessageBox.information(self.view, "Xuất dữ liệu", "Chức năng xuất Excel đang được xử lý.")
-
-    def run(self):
-        self.view.show()

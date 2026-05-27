@@ -1,11 +1,9 @@
 from PyQt6.QtWidgets import *
 from PyQt6.QtCore import Qt
 import pyodbc
-from Utils.user_session import UserSession
-
+from Utils.user_session import UserSession   # <-- THÊM DÒNG NÀY
 
 class LoginWindow(QWidget):
-
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Đăng nhập hệ thống")
@@ -103,7 +101,6 @@ class LoginWindow(QWidget):
                     self.vaitro = "NhanVien"
 
             session = UserSession()
-            # SỬA DÒNG NÀY: thêm self.hoten vào vị trí thứ 3
             session.set_user(self.user_id, user, self.hoten, don_vi_id, is_admin, self.vaitro, ten_don_vi)
 
             QMessageBox.information(self, "Đăng nhập thành công", f"Xin chào {self.hoten}\nVai trò: {self.vaitro}")

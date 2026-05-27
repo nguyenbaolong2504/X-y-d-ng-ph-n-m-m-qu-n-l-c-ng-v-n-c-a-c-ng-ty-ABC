@@ -158,15 +158,15 @@ class MainApp(QMainWindow):
     def __init__(self, user_session):
         super().__init__()
         self.user_session = user_session
+        self.logout_requested = False          # THÊM DÒNG NÀY
         self.setWindowTitle("Hệ Thống Quản Lý Văn Bản - Công Ty ABC")
         self.setGeometry(100, 100, 1500, 850)
         self.setStyleSheet("QMainWindow { background-color: #ffffff; }")
         self.setup_ui()
 
     def logout(self):
-        """Đăng xuất và thoát ứng dụng"""
+        self.logout_requested = True
         self.close()
-        QApplication.quit()
 
     def setup_ui(self):
         central = QWidget()
@@ -244,18 +244,17 @@ class MainApp(QMainWindow):
         """)
         self.sidebar.addItem(QListWidgetItem(" ☰ "))
         menu_items = [
-
             "🏠 Tổng quan hệ thống",
             "📥 Văn bản đến",
             "📤 Văn bản đi",
             "📄 Văn bản nội bộ",
+            "📥 Văn bản nội bộ của tôi",   # Thêm dòng này
             "👥 Danh sách cán bộ",
             "📂 Danh mục chức vụ",
             "⏳ Thời hạn bảo quản",
             "🏷️ Loại công văn",
             "🏢 Đơn vị, bộ phận",
             "⚙️ Xử lý công văn",
-
             "🔐 Phân quyền sử dụng",
             "🗂️ Mục lục hồ sơ",
             "📁 Danh mục hồ sơ",
@@ -328,7 +327,6 @@ class MainApp(QMainWindow):
             except Exception as e:
                 self.stacked_widget.addWidget(QLabel(f"❌ Lỗi HBQ: {str(e)}"))
         else:
-
             self.stacked_widget.addWidget(
                 QLabel("Module HBQ chưa sẵn sàng")
             )
@@ -386,7 +384,6 @@ class MainApp(QMainWindow):
             self.tab_phanquyen = QuanLyPhanQuyen()
             self.stacked_widget.addWidget(self.tab_phanquyen)
         except Exception as e:
-
             self.stacked_widget.addWidget(
                 QLabel(f"❌ Lỗi phân quyền: {str(e)}")
             )
@@ -399,7 +396,6 @@ class MainApp(QMainWindow):
             self.tab_muclichoso = MucLucHoSo()
             self.stacked_widget.addWidget(self.tab_muclichoso)
         except Exception as e:
-
             self.stacked_widget.addWidget(
                 QLabel(f"❌ Lỗi mục lục hồ sơ: {str(e)}")
             )
@@ -412,7 +408,6 @@ class MainApp(QMainWindow):
             self.tab_danhmuchoso = DanhMucHoSo()
             self.stacked_widget.addWidget(self.tab_danhmuchoso)
         except Exception as e:
-
             self.stacked_widget.addWidget(
                 QLabel(f"❌ Lỗi danh mục hồ sơ: {str(e)}")
             )
@@ -422,14 +417,79 @@ class MainApp(QMainWindow):
         # =============================================================
 
         try:
-            self.tab_congviec = QuanLyCongViec()
+            self.tab_congviec = QuanLyCongViec(self.user_session, CONN_STR)
             self.stacked_widget.addWidget(self.tab_congviec)
         except Exception as e:
             self.stacked_widget.addWidget(QLabel(f"❌ Lỗi công việc: {str(e)}"))
 
+        # =============================================================
+        # 14. VĂN BẢN NỘI BỘ CỦA TÔI (DÀNH CHO NGƯỜI NHẬN)
+        # =============================================================
+        try:
+            from View.view_noibo_nhan import NoiBoNhanWidget
+            from Controller.controller_noibo_nhan import ControllerNoiBoNhan
+            self.tab_noibo_nhan = NoiBoNhanWidget(self.user_session, CONN_STR, ModelNoiBo())
+            self.noibo_nhan_controller = ControllerNoiBoNhan(ModelNoiBo(), self.tab_noibo_nhan, self.user_session)
+            self.stacked_widget.addWidget(self.tab_noibo_nhan)
+        except Exception as e:
+            self.stacked_widget.addWidget(QLabel(f"❌ Lỗi văn bản nội bộ của tôi: {str(e)}"))
+
     def change_page(self, index):
         if index > 0:
-            self.stacked_widget.setCurrentIndex(index - 1)
+            # Map chỉ mục sidebar sang chỉ mục stacked_widget
+            # Danh sách các tab theo thứ tự stacked_widget:
+            # 0: Trang chủ
+            # 1: Văn bản đến
+            # 2: Văn bản đi
+            # 3: Văn bản nội bộ (quản lý)
+            # 4: Danh sách cán bộ
+            # 5: Danh mục chức vụ
+            # 6: Thời hạn bảo quản
+            # 7: Loại công văn
+            # 8: Đơn vị, bộ phận
+            # 9: Xử lý công văn
+            # 10: Phân quyền sử dụng
+            # 11: Mục lục hồ sơ
+            # 12: Danh mục hồ sơ
+            # 13: Công việc
+            # 14: Văn bản nội bộ của tôi
+            #
+            # Sidebar index (bắt đầu từ 1, vì index 0 là " ☰ "):
+            # 1: Tổng quan hệ thống -> stacked 0
+            # 2: Văn bản đến -> stacked 1
+            # 3: Văn bản đi -> stacked 2
+            # 4: Văn bản nội bộ -> stacked 3
+            # 5: Văn bản nội bộ của tôi -> stacked 14
+            # 6: Danh sách cán bộ -> stacked 4
+            # 7: Danh mục chức vụ -> stacked 5
+            # 8: Thời hạn bảo quản -> stacked 6
+            # 9: Loại công văn -> stacked 7
+            # 10: Đơn vị, bộ phận -> stacked 8
+            # 11: Xử lý công văn -> stacked 9
+            # 12: Phân quyền sử dụng -> stacked 10
+            # 13: Mục lục hồ sơ -> stacked 11
+            # 14: Danh mục hồ sơ -> stacked 12
+            # 15: Công việc -> stacked 13
+            mapping = {
+                1: 0,   # Tổng quan
+                2: 1,   # Văn bản đến
+                3: 2,   # Văn bản đi
+                4: 3,   # Văn bản nội bộ (quản lý)
+                5: 14,  # Văn bản nội bộ của tôi
+                6: 4,   # Danh sách cán bộ
+                7: 5,   # Danh mục chức vụ
+                8: 6,   # Thời hạn bảo quản
+                9: 7,   # Loại công văn
+                10: 8,  # Đơn vị, bộ phận
+                11: 9,  # Xử lý công văn
+                12: 10, # Phân quyền sử dụng
+                13: 11, # Mục lục hồ sơ
+                14: 12, # Danh mục hồ sơ
+                15: 13, # Công việc
+            }
+            stacked_idx = mapping.get(index)
+            if stacked_idx is not None:
+                self.stacked_widget.setCurrentIndex(stacked_idx)
             if index == 1 and hasattr(self, 'home_controller'):
                 self.home_controller.load_data()
 
@@ -437,30 +497,22 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setFont(QFont("Segoe UI", 10))
 
-    login = LoginWindow()
-    login.show()
-    app.exec()
+    while True:
+        login = LoginWindow()
+        login.show()
+        app.exec()
 
-    if not hasattr(login, "vaitro"):
-        sys.exit()
+        session = UserSession()
+        if not session.user_id:
+            break
 
-    # Lấy session đã lưu (phải được tạo trong login.py)
-    from Utils.user_session import UserSession   # nếu chưa import ở đầu
-    session = UserSession()
-    if not session.user_id:
-        sys.exit()
+        window = MainApp(session)
+        window.show()
+        app.exec()
 
-    window = MainApp(session)   # <--- SỬA Ở ĐÂY: truyền session
+        if window.logout_requested:
+            continue
+        else:
+            break
 
-    vaitro = session.get_role()
-    if vaitro == "Admin":
-        window.setWindowTitle("HỆ THỐNG QUẢN LÝ VĂN BẢN - ADMIN")
-    elif vaitro == "GiamDoc":
-        window.setWindowTitle("HỆ THỐNG QUẢN LÝ VĂN BẢN - GIÁM ĐỐC")
-    elif vaitro == "TruongPhong":
-        window.setWindowTitle("HỆ THỐNG QUẢN LÝ VĂN BẢN - TRƯỞNG PHÒNG")
-    elif vaitro == "NhanVien":
-        window.setWindowTitle("HỆ THỐNG QUẢN LÝ VĂN BẢN - NHÂN VIÊN")
-
-    window.show()
-    sys.exit(app.exec())
+    sys.exit()

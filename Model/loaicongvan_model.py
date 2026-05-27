@@ -5,17 +5,23 @@ class LoaiCongVanModel:
     def __init__(self, connection_string):
         self.conn_str = connection_string
 
-    def get_all(self):
+    def get_all(self, trang_thai=None):
+        """Lấy danh sách loại công văn, nếu trang_thai được chỉ định thì lọc theo đó (1: đến, 2: đi)"""
         try:
             with pyodbc.connect(self.conn_str) as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT Id, MaLoai, TenLoai, MoTa, TrangThai, NgayTao FROM dbo.LoaiCongVan ORDER BY Id ASC")
+                if trang_thai is not None:
+                    sql = "SELECT Id, MaLoai, TenLoai, MoTa, TrangThai, NgayTao FROM dbo.LoaiCongVan WHERE TrangThai = ? ORDER BY Id ASC"
+                    cursor.execute(sql, (trang_thai,))
+                else:
+                    sql = "SELECT Id, MaLoai, TenLoai, MoTa, TrangThai, NgayTao FROM dbo.LoaiCongVan ORDER BY Id ASC"
+                    cursor.execute(sql)
                 columns = [column[0] for column in cursor.description]
                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
         except pyodbc.Error as e:
             print(f"Lỗi truy vấn SQL (LoaiCongVan): {e}")
             return [] 
-            
+
     def search(self, keyword):
         try:
             with pyodbc.connect(self.conn_str) as conn:
