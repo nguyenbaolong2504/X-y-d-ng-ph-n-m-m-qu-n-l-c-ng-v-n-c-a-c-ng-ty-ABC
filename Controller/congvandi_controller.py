@@ -2,6 +2,7 @@ from Utils.excel_export import export_to_excel
 from Model.congvandi_model import CongVanDiModel
 from Model.congvandi_table_model import CongVanDiTableModel
 from View.quanlycongvandi import MainWindowDi
+<<<<<<< HEAD
 from Model.loaicongvan_model import LoaiCongVanModel 
 import pyodbc
 import os
@@ -9,6 +10,9 @@ import shutil
 from datetime import datetime
 from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtGui import QDesktopServices
+=======
+
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
 
 class CongVanDiController:
     def __init__(self, model: CongVanDiModel, view: MainWindowDi, user_session):
@@ -16,16 +20,20 @@ class CongVanDiController:
         self.view = view
         self.user_session = user_session
         self.table_model = None
+<<<<<<< HEAD
 
         self.current_keyword = None
         self.current_tu_ngay = None
         self.current_den_ngay = None
+=======
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
 
         self.view.them_cv_signal.connect(self.them_cong_van)
         self.view.sua_cv_signal.connect(self.sua_cong_van)
         self.view.xoa_cv_signal.connect(self.xoa_cong_van)
         self.view.tim_kiem_signal.connect(self.tim_kiem)
         self.view.loc_cv_signal.connect(self.loc_cong_van)
+<<<<<<< HEAD
         self.view.nap_dulieu_signal.connect(self.nap_lai_du_lieu)
         self.view.xuat_excel_signal.connect(self.xuat_excel)
         self.view.table_view.clicked.connect(self.on_table_click)
@@ -76,13 +84,25 @@ class CongVanDiController:
         except Exception as e:
             print(f"Lỗi nạp nhân sự: {e}")
             self.view.set_nhan_su_list([])
+=======
+        self.view.nap_dulieu_signal.connect(self.load_data)
+        self.view.xuat_excel_signal.connect(self.xuat_excel)
+
+        self.load_data()
+
+    def get_headers(self):
+        return ["ID", "Số đi", "Năm", "Ký hiệu", "Ngày ký", "Nơi nhận", "Trích yếu", "Trạng thái"]
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
 
     def load_data(self):
         try:
             data = self.model.get_all(
+<<<<<<< HEAD
                 tu_ngay=self.current_tu_ngay,
                 den_ngay=self.current_den_ngay,
                 keyword=self.current_keyword,
+=======
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
                 is_admin=self.user_session.is_admin_user(),
                 role=self.user_session.get_role(),
                 ten_don_vi=self.user_session.get_ten_don_vi()
@@ -93,6 +113,7 @@ class CongVanDiController:
         except Exception as e:
             self.view.show_error(f"Lỗi tải dữ liệu: {str(e)}")
 
+<<<<<<< HEAD
     def nap_lai_du_lieu(self):
         self.current_keyword = None
         self.current_tu_ngay = None
@@ -114,6 +135,17 @@ class CongVanDiController:
         self.load_data()
 
     def them_cong_van(self, data: dict):
+=======
+    def them_cong_van(self, data: dict):
+        try:
+            self.model.add(data)
+            self.load_data()
+            self.view.show_status("Thêm công văn đi thành công!")
+        except Exception as e:
+            self.view.show_error(f"Lỗi thêm: {str(e)}")
+
+    def sua_cong_van(self, id_cv: int, new_data: dict):
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
         try:
             file_path = data.get('FilePath')
             if file_path and os.path.isfile(file_path):
@@ -145,7 +177,7 @@ class CongVanDiController:
                 new_data['FilePath'] = dest_path
             self.model.update(id_cv, new_data)
             self.load_data()
-            self.view.show_status("Cập nhật thành công")
+            self.view.show_status(f"Cập nhật ID {id_cv} thành công")
         except Exception as e:
             self.view.show_error(f"Lỗi cập nhật: {str(e)}")
 
@@ -153,6 +185,7 @@ class CongVanDiController:
         try:
             self.model.delete(id_cv)
             self.load_data()
+<<<<<<< HEAD
             self.view.show_status("Đã xóa công văn!")
         except Exception as e:
             self.view.show_error(f"Lỗi xóa: {str(e)}")
@@ -160,15 +193,38 @@ class CongVanDiController:
     def xuat_excel(self):
         try:
             data = self.table_model._data if self.table_model else []
+=======
+            self.view.show_status(f"Đã xóa công văn đi ID {id_cv}")
+        except Exception as e:
+            self.view.show_error(f"Lỗi xóa: {str(e)}")
+
+    def tim_kiem(self, keyword: str):
+        # Tạm thời gọi load_data, bạn có thể implement search riêng nếu cần
+        self.load_data()
+
+    def loc_cong_van(self, tu, den):
+        # Tạm thời gọi load_data, bạn có thể implement filter riêng
+        self.load_data()
+
+    def xuat_excel(self):
+        try:
+            data = self.table_model._data if self.table_model else self.model.get_all()
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
             if not data:
-                self.view.show_error("Không có dữ liệu để xuất!")
+                self.view.show_error("Không có dữ liệu!")
                 return
+<<<<<<< HEAD
+=======
+            # Giả sử bạn có hàm export_to_excel cho công văn đi
+            from Utils.excel_export import export_to_excel
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
             success, msg = export_to_excel(data, sheet_name="CongVanDi")
             if success:
                 self.view.show_status(msg)
             else:
                 self.view.show_error(msg)
         except Exception as e:
+<<<<<<< HEAD
             self.view.show_error(f"Lỗi xuất Excel: {str(e)}")
 
     def on_table_click(self, index):
@@ -180,3 +236,6 @@ class CongVanDiController:
                 QDesktopServices.openUrl(QUrl.fromLocalFile(os.path.abspath(file_path)))
             except Exception as e:
                 self.view.show_error(f"Không thể mở file: {str(e)}")
+=======
+            self.view.show_error(f"Lỗi xuất Excel: {str(e)}")
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987

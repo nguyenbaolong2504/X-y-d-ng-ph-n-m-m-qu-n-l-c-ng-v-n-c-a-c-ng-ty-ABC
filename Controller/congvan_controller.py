@@ -79,9 +79,15 @@ class CongVanController:
                 role=self.user_session.get_role(),
                 ten_don_vi=self.user_session.get_ten_don_vi()
             )
+<<<<<<< HEAD
             self._update_table_view(data)
             if hasattr(self.view, 'cb_loai_vb'):
                 self.view.cb_loai_vb.setCurrentIndex(0)
+=======
+            self.table_model = CongVanTableModel(data, self.get_headers())
+            self.view.set_table_model(self.table_model)
+            self.view.cb_loai_vb.setCurrentIndex(0)
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
             self.view.show_status(f"Đã tải {len(data)} công văn")
         except Exception as e:
             self._handle_error(f"Lỗi tải dữ liệu: {str(e)}")
@@ -94,13 +100,22 @@ class CongVanController:
             if self.view.chk_bo_qua_ngay.isChecked():
                 tu = None
                 den = None
+<<<<<<< HEAD
+=======
+
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
             data = self.model.filter_by_criteria(
                 tu, den, loai_id,
                 is_admin=self.user_session.is_admin_user(),
                 role=self.user_session.get_role(),
                 ten_don_vi=self.user_session.get_ten_don_vi()
             )
+<<<<<<< HEAD
             self._update_table_view(data)
+=======
+            self.table_model = CongVanTableModel(data, self.get_headers())
+            self.view.set_table_model(self.table_model)
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
             self.view.show_status(f"Lọc được {len(data)} mục")
         except Exception as e:
             self._handle_error(f"Lỗi lọc dữ liệu: {str(e)}")
@@ -117,8 +132,14 @@ class CongVanController:
                 role=self.user_session.get_role(),
                 ten_don_vi=self.user_session.get_ten_don_vi()
             )
+<<<<<<< HEAD
             self._update_table_view(data)
             self.view.show_status(f"Tìm thấy {len(data)} kết quả cho '{keyword}'")
+=======
+            self.table_model = CongVanTableModel(data, self.get_headers())
+            self.view.set_table_model(self.table_model)
+            self.view.show_status(f"Tìm thấy {len(data)} kết quả")
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
         except Exception as e:
             self._handle_error(f"Lỗi tìm kiếm: {str(e)}")
 

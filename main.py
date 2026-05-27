@@ -1,4 +1,9 @@
 import sys, os, pyodbc
+<<<<<<< HEAD
+=======
+
+from Utils.user_session import UserSession
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
 _original_pyodbc_connect = pyodbc.connect
 def _intercept_connect(*args, **kwargs):
     # TRẢ VỀ LOCALHOST VÌ MÁY BẠN DÙNG TÊN NÀY MỚI CHẠY ĐƯỢC
@@ -11,6 +16,7 @@ def _intercept_connect(*args, **kwargs):
 
     return _original_pyodbc_connect(my_local_conn_str)
 
+    return _original_pyodbc_connect("DRIVER={SQL Server};SERVER=.\\SQLEXPRESS;DATABASE=congtyadc;Trusted_Connection=yes;")
 pyodbc.connect = _intercept_connect
 
 from PyQt6.QtWidgets import *
@@ -32,6 +38,7 @@ Trusted_Connection=yes;
 # =====================================================================
 # IMPORT SAFE
 # =====================================================================
+CONN_STR = r"DRIVER={SQL Server};SERVER=.\SQLEXPRESS;DATABASE=congtyadc;Trusted_Connection=yes;"
 
 def safe_import(module_name, class_name):
     try:
@@ -149,6 +156,19 @@ DonViController, _ = safe_import(
 # =====================================================================
 
 # --- THÊM MỚI: IMPORT MODULE XỬ LÝ CÔNG VĂN ---
+ControllerNoiBo, _ = safe_import("Controller.controller_noibo", "ControllerNoiBo")
+CanBoModel, CANBO_OK = safe_import("Model.canbo_model", "CanBoModel")
+CanBoWindow, _ = safe_import("View.quanlycanbo", "CanBoWindow")
+CanBoController, _ = safe_import("Controller.canbo_controller", "CanBoController")
+ChucVuModel, CHUCVU_OK = safe_import("Model.chucvu_model", "ChucVuModel")
+ChucVuWindow, _ = safe_import("View.quanlychucvu", "ChucVuWindow")
+ChucVuController, _ = safe_import("Controller.chucvu_controller", "ChucVuController")
+HanBaoQuanModel, HBQ_OK = safe_import("Model.hanbaoquan_model", "HanBaoQuanModel")
+HanBaoQuanWindow, _ = safe_import("View.quanlyhanbaoquan", "HanBaoQuanWindow")
+HanBaoQuanController, _ = safe_import("Controller.hanbaoquan_controller", "HanBaoQuanController")
+# LoaiVanBanModel, LVB_OK = safe_import("Model.loaivanban_model", "LoaiVanBanModel")
+# LoaiVanBanWindow, _ = safe_import("View.quanlyloaivanban", "LoaiVanBanWindow")
+# LoaiVanBanController, _ = safe_import("Controller.loaivanban_controller", "LoaiVanBanController")
 XuLyCongVanModel, XULY_OK = safe_import("Model.xulycongvan_model", "XuLyCongVanModel")
 QuanLyXuLyCongVanView, _ = safe_import("View.quanlyxulycongvan", "QuanLyXuLyCongVanView")
 CongVanControllerCustom, _ = safe_import("Controller.xulycongvan_controller", "CongVanController")
@@ -158,15 +178,24 @@ class MainApp(QMainWindow):
     def __init__(self, user_session):
         super().__init__()
         self.user_session = user_session
+<<<<<<< HEAD
         self.logout_requested = False          # THÊM DÒNG NÀY
+=======
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
         self.setWindowTitle("Hệ Thống Quản Lý Văn Bản - Công Ty ABC")
         self.setGeometry(100, 100, 1500, 850)
         self.setStyleSheet("QMainWindow { background-color: #ffffff; }")
         self.setup_ui()
 
     def logout(self):
+<<<<<<< HEAD
         self.logout_requested = True
         self.close()
+=======
+        """Đăng xuất và thoát ứng dụng"""
+        self.close()
+        QApplication.quit()
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
 
     def setup_ui(self):
         central = QWidget()
@@ -258,7 +287,8 @@ class MainApp(QMainWindow):
             "🔐 Phân quyền sử dụng",
             "🗂️ Mục lục hồ sơ",
             "📁 Danh mục hồ sơ",
-            "✅ Công việc"
+            "✅ Công việc",
+            
         ]
         for text in menu_items:
             self.sidebar.addItem(QListWidgetItem(text))
@@ -327,6 +357,11 @@ class MainApp(QMainWindow):
             except Exception as e:
                 self.stacked_widget.addWidget(QLabel(f"❌ Lỗi HBQ: {str(e)}"))
         else:
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
             self.stacked_widget.addWidget(
                 QLabel("Module HBQ chưa sẵn sàng")
             )
@@ -353,6 +388,17 @@ class MainApp(QMainWindow):
         # 8. ĐƠN VỊ
         # =============================================================
 
+            self.stacked_widget.addWidget(QLabel("Module HBQ chưa sẵn sàng"))
+        
+        if False:
+            try:
+                self.tab_lvb = LoaiVanBanWindow()
+                self.ctrl_lvb_den = LoaiVanBanController(LoaiVanBanModel(CONN_STR, "PhanLoaiCongVanDen"), self.tab_lvb.view_den)
+                self.ctrl_lvb_di = LoaiVanBanController(LoaiVanBanModel(CONN_STR, "PhanLoaiCongVanPhatHanh"), self.tab_lvb.view_di)
+                self.stacked_widget.addWidget(self.tab_lvb)
+            except Exception as e:
+                self.stacked_widget.addWidget(QLabel(f"❌ Lỗi loại văn bản: {str(e)}"))
+        
         if DV_OK:
             try:
                 self.tab_dv = DonViWindow()
@@ -375,7 +421,6 @@ class MainApp(QMainWindow):
                 self.stacked_widget.addWidget(QLabel(f"❌ Lỗi module Xử lý công văn: {str(e)}"))
         else:
             self.stacked_widget.addWidget(QLabel("Module Xử lý công văn chưa sẵn sàng"))
-
         # =============================================================
         # 10. PHÂN QUYỀN
         # =============================================================
@@ -392,6 +437,8 @@ class MainApp(QMainWindow):
         # 11. MỤC LỤC HỒ SƠ
         # =============================================================
 
+            self.stacked_widget.addWidget(QLabel(f"❌ Lỗi phân quyền: {str(e)}"))
+        
         try:
             self.tab_muclichoso = MucLucHoSo()
             self.stacked_widget.addWidget(self.tab_muclichoso)
@@ -404,6 +451,8 @@ class MainApp(QMainWindow):
         # 12. DANH MỤC HỒ SƠ
         # =============================================================
 
+            self.stacked_widget.addWidget(QLabel(f"❌ Lỗi mục lục hồ sơ: {str(e)}"))
+        
         try:
             self.tab_danhmuchoso = DanhMucHoSo()
             self.stacked_widget.addWidget(self.tab_danhmuchoso)
@@ -416,6 +465,7 @@ class MainApp(QMainWindow):
         # 13. CÔNG VIỆC
         # =============================================================
 
+<<<<<<< HEAD
         try:
             self.tab_congviec = QuanLyCongViec(self.user_session, CONN_STR)
             self.stacked_widget.addWidget(self.tab_congviec)
@@ -490,6 +540,20 @@ class MainApp(QMainWindow):
             stacked_idx = mapping.get(index)
             if stacked_idx is not None:
                 self.stacked_widget.setCurrentIndex(stacked_idx)
+=======
+
+            self.stacked_widget.addWidget(QLabel(f"❌ Lỗi danh mục hồ sơ: {str(e)}"))
+        
+        try:
+            self.tab_congviec = QuanLyCongViec()
+            self.stacked_widget.addWidget(self.tab_congviec)
+        except Exception as e:
+            self.stacked_widget.addWidget(QLabel(f"❌ Lỗi công việc: {str(e)}"))
+
+    def change_page(self, index):
+        if index > 0:
+            self.stacked_widget.setCurrentIndex(index - 1)
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
             if index == 1 and hasattr(self, 'home_controller'):
                 self.home_controller.load_data()
 
@@ -497,6 +561,7 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setFont(QFont("Segoe UI", 10))
 
+<<<<<<< HEAD
     while True:
         login = LoginWindow()
         login.show()
@@ -509,10 +574,77 @@ if __name__ == "__main__":
         window = MainApp(session)
         window.show()
         app.exec()
+=======
+    login = LoginWindow()
+    login.show()
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
 
         if window.logout_requested:
             continue
         else:
             break
 
+<<<<<<< HEAD
     sys.exit()
+=======
+    if not hasattr(login, "vaitro"):
+        sys.exit()
+
+    session = UserSession()
+
+    if not session.user_id:
+        sys.exit()
+
+    window = MainApp(session)
+
+    window.show()
+
+    sys.exit(app.exec())
+
+    # =============================================================
+    # CHƯA LOGIN
+    # =============================================================
+
+    if not hasattr(login, "vaitro"):
+
+        sys.exit()
+
+    vaitro = login.vaitro
+
+    # =============================================================
+    # MAIN WINDOW
+    # =============================================================
+
+    session = UserSession()
+
+    window = MainApp(session)
+
+    # =============================================================
+    # ADMIN
+    # =============================================================
+
+    if vaitro == "Admin": 
+        pass
+
+
+    # =============================================================
+    # GIÁM ĐỐC
+    # =============================================================
+
+
+    if not hasattr(login, "vaitro"): sys.exit()
+    session = UserSession()
+    if not session.user_id: sys.exit()
+    window = MainApp(session)
+    vaitro = session.get_role()
+    if vaitro == "Admin":
+        window.setWindowTitle("HỆ THỐNG QUẢN LÝ VĂN BẢN - ADMIN")
+    elif vaitro == "GiamDoc":
+        window.setWindowTitle("HỆ THỐNG QUẢN LÝ VĂN BẢN - GIÁM ĐỐC")
+    elif vaitro == "TruongPhong":
+        window.setWindowTitle("HỆ THỐNG QUẢN LÝ VĂN BẢN - TRƯỞNG PHÒNG")
+    elif vaitro == "NhanVien":
+        window.setWindowTitle("HỆ THỐNG QUẢN LÝ VĂN BẢN - NHÂN VIÊN")
+    window.show()
+    sys.exit(app.exec())
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987

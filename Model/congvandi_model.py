@@ -34,6 +34,7 @@ class CongVanDiModel:
         except Exception as e:
             raise Exception(f"Lỗi truy vấn cơ sở dữ liệu: {str(e)}")
 
+<<<<<<< HEAD
     def get_max_so_phat_hanh(self) -> int:
         try:
             with self._get_connection() as conn:
@@ -91,6 +92,98 @@ class CongVanDiModel:
                 conn.commit()
         except Exception as e:
             raise Exception(f"Lỗi thêm công văn đi: {str(e)}")
+=======
+    def get_all(
+        self,
+        is_admin=False,
+        role=None,
+        ten_don_vi=None
+    ) -> List[Dict]:
+
+        sql = """
+
+            SELECT 
+                Id,
+                SoPhatHanh,
+                Nam,
+                KyHieu,
+                NgayKy,
+                NoiNhan,
+                TrichYeu,
+                TrangThaiChuyen,
+                GhiChu,
+                FilePath
+
+            FROM CongVanPhatHanh
+
+        """
+
+        conditions = []
+
+        params = []
+
+        if not is_admin:
+
+            if role in ('TruongPhong', 'NhanVien'):
+
+                conditions.append(
+                    "NoiNhan = ?"
+                )
+
+                params.append(
+                    ten_don_vi
+                )
+
+        if conditions:
+
+            sql += " WHERE " + " AND ".join(
+                conditions
+            )
+
+        sql += " ORDER BY Id DESC"
+
+        try:
+
+            with self._get_connection() as conn:
+
+                cursor = conn.cursor()
+
+                cursor.execute(
+                    sql,
+                    params
+                )
+
+                rows = cursor.fetchall()
+
+                return [
+
+                    dict(
+
+                        zip(
+
+                            [col[0]
+                             for col in cursor.description],
+
+                            row
+
+                        )
+
+                    )
+
+                    for row in rows
+
+                ]
+
+        except Exception as e:
+
+            print(e)
+
+            return []
+
+    # =====================================================
+    # ADD
+    # =====================================================
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
 
     def add(self, data: Dict):
         try:
@@ -148,6 +241,7 @@ class CongVanDiModel:
         except Exception as e:
             raise Exception(f"Lỗi thêm công văn đi: {str(e)}")
 
+<<<<<<< HEAD
     def update(self, id_cv: int, data: Dict):
         try:
             with self._get_connection() as conn:
@@ -167,6 +261,9 @@ class CongVanDiModel:
                         don_vi_soan_id = 1
                 else:
                     don_vi_soan_id = 1
+=======
+            """
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
 
                 nguoi_ky_id = data.get('NguoiKyId')
                 if nguoi_ky_id is not None:
@@ -199,6 +296,7 @@ class CongVanDiModel:
         except Exception as e:
             raise Exception(f"Lỗi cập nhật công văn đi: {str(e)}")
 
+<<<<<<< HEAD
     def delete(self, id_cv: int):
         try:
             with self._get_connection() as conn:
@@ -207,3 +305,95 @@ class CongVanDiModel:
                 conn.commit()
         except Exception as e:
             raise Exception(f"Lỗi xóa công văn đi: {str(e)}")
+=======
+                data.get('KyHieu'),
+
+                data.get('NgayKy'),
+
+                data.get('TrichYeu'),
+
+                data.get('NoiNhan'),
+
+                data.get('GhiChu'),
+
+                data.get('FilePath')
+
+            ))
+
+            conn.commit()
+
+    # =====================================================
+    # UPDATE
+    # =====================================================
+
+    def update(self, id: int, data: Dict):
+
+        with self._get_connection() as conn:
+
+            cursor = conn.cursor()
+
+            sql = """
+
+                UPDATE CongVanPhatHanh
+
+                SET
+                    SoPhatHanh=?,
+                    Nam=?,
+                    KyHieu=?,
+                    NgayKy=?,
+                    TrichYeu=?,
+                    NoiNhan=?,
+                    TrangThaiChuyen=?,
+                    GhiChu=?,
+                    FilePath=?
+
+                WHERE Id=?
+
+            """
+
+            cursor.execute(sql, (
+
+                data.get('SoPhatHanh'),
+
+                data.get('Nam'),
+
+                data.get('KyHieu'),
+
+                data.get('NgayKy'),
+
+                data.get('TrichYeu'),
+
+                data.get('NoiNhan'),
+
+                data.get('TrangThaiChuyen', 0),
+
+                data.get('GhiChu'),
+
+                data.get('FilePath'),
+
+                id
+
+            ))
+
+            conn.commit()
+
+    # =====================================================
+    # DELETE
+    # =====================================================
+
+    def delete(self, id: int):
+
+        with self._get_connection() as conn:
+
+            cursor = conn.cursor()
+
+            cursor.execute("""
+
+                DELETE FROM CongVanPhatHanh
+
+                WHERE Id=?
+
+            """,(id,))
+
+            conn.commit()
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987

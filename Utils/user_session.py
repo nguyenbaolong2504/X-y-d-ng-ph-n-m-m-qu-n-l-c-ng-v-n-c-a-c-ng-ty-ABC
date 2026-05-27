@@ -17,7 +17,11 @@ class UserSession:
         self.username = username
         self.hoten = hoten
         self.don_vi_id = don_vi_id
+<<<<<<< HEAD
         self.is_admin = is_admin    
+=======
+        self.is_admin = is_admin
+>>>>>>> 6eb3327898e9fb03bcea83aed79aabac5164e987
         self.role = role
         self.ten_don_vi = ten_don_vi
 
