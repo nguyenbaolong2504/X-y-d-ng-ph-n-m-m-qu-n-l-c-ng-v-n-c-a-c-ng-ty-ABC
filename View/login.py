@@ -9,12 +9,12 @@ class LoginWindow(QWidget):
         self.setWindowTitle("Đăng nhập hệ thống")
         self.resize(450, 300)
 
-        self.conn = pyodbc.connect(
-            "DRIVER={ODBC Driver 17 for SQL Server};"
-            "SERVER=localhost\\SQLEXPRESS;"
-            "DATABASE=congtyadc;"
-            "Trusted_Connection=yes;"
-        )
+        self.conn = pyodbc.connect( 
+            "DRIVER={ODBC Driver 17 for SQL Server};" 
+            "SERVER=localhost\\SQLEXPRESS;" 
+            "DATABASE=master;" 
+            "Trusted_Connection=yes;" 
+            )
 
         self.setStyleSheet("""
             QWidget{

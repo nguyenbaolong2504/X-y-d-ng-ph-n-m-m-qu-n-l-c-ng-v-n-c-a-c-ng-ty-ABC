@@ -2,12 +2,12 @@ import sys, os, pyodbc
 _original_pyodbc_connect = pyodbc.connect
 def _intercept_connect(*args, **kwargs):
     # TRẢ VỀ LOCALHOST VÌ MÁY BẠN DÙNG TÊN NÀY MỚI CHẠY ĐƯỢC
-    my_local_conn_str = (
-        "DRIVER={ODBC Driver 17 for SQL Server};"
+    my_local_conn_str = ( 
+        "DRIVER={ODBC Driver 17 for SQL Server};" 
         "SERVER=localhost\\SQLEXPRESS;" 
-        "DATABASE=congtyadc;"
-        "Trusted_Connection=yes;"
-    )
+        "DATABASE=master;" 
+        "Trusted_Connection=yes;" 
+        )
 
     return _original_pyodbc_connect(my_local_conn_str)
 
@@ -25,7 +25,7 @@ sys.path.insert(0, os.getcwd())
 CONN_STR = r""" 
 DRIVER={ODBC Driver 17 for SQL Server}; 
 SERVER=localhost; 
-DATABASE=congtyadc; 
+DATABASE=master; 
 Trusted_Connection=yes; 
 """
 
