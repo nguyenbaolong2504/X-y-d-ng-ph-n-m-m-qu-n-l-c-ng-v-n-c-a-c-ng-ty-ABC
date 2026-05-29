@@ -1,292 +1,601 @@
-from PyQt6.QtWidgets import *
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
-from PyQt6.QtGui import QFont, QIcon, QAction
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+                             QFrame, QTableWidget, QTableWidgetItem, QHeaderView, QComboBox, 
+                             QAbstractItemView, QSizePolicy, QScrollArea, QDateEdit, QPushButton)
+from PyQt6.QtCore import Qt, pyqtSignal, QDate
+from PyQt6.QtGui import QFont, QColor
+
+import numpy as np
+import matplotlib
+matplotlib.use('QtAgg')
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+from datetime import datetime
+
+# ==========================================
+# BIỂU ĐỒ ĐƯỜNG MODERN PREMIUM SAAS (STRAIGHT LINE)
+# ==========================================
+class LineChart(FigureCanvas):
+    def __init__(self, parent=None):
+        fig = Figure(figsize=(8, 5), dpi=130) 
+        fig.patch.set_facecolor('#ffffff')
+        fig.subplots_adjust(left=0.05, right=0.98, top=0.92, bottom=0.15)
+        self.axes = fig.add_subplot(111)
+        super().__init__(fig)
+        
+        self.mpl_connect("motion_notify_event", self.on_hover)
+        self.annot = None
+        self.x_labels = []
+        self.hover_labels = []
+        self.x_num = []
+        self.den_vals = []
+        self.di_vals = []
+        self.scatter_den = None
+        self.scatter_di = None
+
+    def update_chart(self, display_labels, hover_labels, den_values, di_values):
+        self.axes.clear()
+        if not display_labels:
+            display_labels = [f"T{i}" for i in range(1, 13)]
+            hover_labels = display_labels
+            den_values = [0]*12
+            di_values = [0]*12
+
+        self.x_labels = display_labels
+        self.hover_labels = hover_labels
+        self.x_num = np.arange(len(display_labels))
+        self.den_vals = np.array(den_values)
+        self.di_vals = np.array(di_values)
+
+        color_den = '#8A2BE2' # Tím
+        color_di = '#00E5FF'  # Xanh Cyan
+        
+        # --- VẼ ĐƯỜNG THẲNG (STRAIGHT LINES) ---
+        # 1. Tạo hiệu ứng Glow nhẹ (bóng đổ mờ dưới line)
+        for n in range(1, 6):
+            self.axes.plot(self.x_num, self.den_vals, color=color_den, linewidth=2 + (n*1.2), alpha=0.04, zorder=1)
+            self.axes.plot(self.x_num, self.di_vals, color=color_di, linewidth=2 + (n*1.2), alpha=0.04, zorder=1)
+
+        # 2. Vẽ đường thẳng chính (Sharp/Straight lines)
+        self.axes.plot(self.x_num, self.den_vals, color=color_den, linewidth=3.5, label='Công văn đến', zorder=3)
+        self.axes.plot(self.x_num, self.di_vals, color=color_di, linewidth=3.5, label='Công văn đi', zorder=3)
+        
+        # 3. Phủ mờ vùng dưới đường (Area Fill)
+        self.axes.fill_between(self.x_num, self.den_vals, color=color_den, alpha=0.08, zorder=2)
+        self.axes.fill_between(self.x_num, self.di_vals, color=color_di, alpha=0.08, zorder=2)
+
+        # 4. Chấm điểm Dot Point rõ nét (Viền trắng)
+        self.scatter_den = self.axes.scatter(self.x_num, self.den_vals, facecolors=color_den, edgecolors='white', s=90, linewidths=2.5, zorder=4)
+        self.scatter_di = self.axes.scatter(self.x_num, self.di_vals, facecolors=color_di, edgecolors='white', s=90, linewidths=2.5, zorder=4)
+
+        # 5. Cấu hình Trục và Grid (Minimal UI)
+        self.axes.set_xticks(self.x_num)
+        self.axes.set_xticklabels(self.x_labels, rotation=0, ha='center', fontweight='500')
+        max_y = max(max(den_values, default=0), max(di_values, default=0))
+        self.axes.set_ylim(0, max_y * 1.25 if max_y > 0 else 10)
+        
+        self.axes.spines['top'].set_visible(False)
+        self.axes.spines['right'].set_visible(False)
+        self.axes.spines['left'].set_visible(False) 
+        self.axes.spines['bottom'].set_visible(False)
+        
+        self.axes.grid(axis='y', linestyle='-', alpha=0.3, color='#E2E8F0', zorder=0)
+        self.axes.tick_params(axis='x', colors='#A0AEC0', length=0, pad=15, labelsize=10)
+        self.axes.tick_params(axis='y', colors='#A0AEC0', length=0, pad=5, labelsize=10)
+        self.axes.margins(x=0.03, y=0)
+
+        # 6. Chú thích (Legend)
+        legend = self.axes.legend(loc='upper right', frameon=True, fontsize=10, labelcolor='#4A5568', edgecolor='#F8F9FA', facecolor='#F8F9FA')
+        for line in legend.get_lines():
+            line.set_linewidth(3.5)
+
+        # 7. Khởi tạo Tooltip (Hộp thoại Hover)
+        self.annot = self.axes.annotate(
+            "", xy=(0,0), xytext=(0, 20), textcoords="offset points",
+            bbox=dict(boxstyle="round,pad=0.6", fc="#1E1E2D", ec="none", alpha=0.9),
+            fontsize=11, fontweight='bold', color="white", ha='center', zorder=10
+        )
+        self.annot.set_visible(False)
+        self.vline = self.axes.axvline(x=0, color="#CBD5E0", linestyle="dashed", linewidth=1.5, alpha=0.8, zorder=2)
+        self.vline.set_visible(False)
+        self.draw()
+
+    def on_hover(self, event):
+        if not event.inaxes == self.axes:
+            if self.annot and self.annot.get_visible():
+                self.annot.set_visible(False)
+                self.vline.set_visible(False)
+                self.draw_idle()
+            return
+
+        min_dist_x = float('inf')
+        closest_idx = None
+        
+        for idx, x in enumerate(self.x_num):
+            dist_x = abs(x - event.xdata)
+            if dist_x < 0.4 and dist_x < min_dist_x:
+                min_dist_x = dist_x
+                closest_idx = idx
+
+        if closest_idx is not None:
+            y_den = self.den_vals[closest_idx]
+            y_di = self.di_vals[closest_idx]
+            
+            label_text = f"{self.hover_labels[closest_idx]}\n📥 Đến: {int(y_den)}   |   📤 Đi: {int(y_di)}"
+            max_y = max(y_den, y_di)
+            self.annot.xy = (self.x_num[closest_idx], max_y)
+            self.annot.set_text(label_text)
+            self.annot.set_visible(True)
+            self.vline.set_xdata([self.x_num[closest_idx]])
+            self.vline.set_visible(True)
+            if self.scatter_den: self.scatter_den.set_sizes([180 if i == closest_idx else 90 for i in range(len(self.x_num))])
+            if self.scatter_di: self.scatter_di.set_sizes([180 if i == closest_idx else 90 for i in range(len(self.x_num))])
+            self.draw_idle()
+        else:
+            if self.annot and self.annot.get_visible():
+                self.annot.set_visible(False)
+                self.vline.set_visible(False)
+                if self.scatter_den: self.scatter_den.set_sizes([90]*len(self.x_num))
+                if self.scatter_di: self.scatter_di.set_sizes([90]*len(self.x_num))
+                self.draw_idle()
+                
+    def __init__(self, parent=None):
+        fig = Figure(figsize=(8, 5), dpi=130) 
+        fig.patch.set_facecolor('#ffffff')
+        fig.subplots_adjust(left=0.05, right=0.98, top=0.92, bottom=0.15)
+        self.axes = fig.add_subplot(111)
+        super().__init__(fig)
+        
+        self.mpl_connect("motion_notify_event", self.on_hover)
+        self.annot = None
+        self.x_labels = []
+        self.hover_labels = []
+        self.x_num = []
+        self.den_vals = []
+        self.di_vals = []
+        self.scatter_den = None
+        self.scatter_di = None
+
+    def update_chart(self, display_labels, hover_labels, den_values, di_values):
+        self.axes.clear()
+        if not display_labels:
+            display_labels = [f"T{i}" for i in range(1, 13)]
+            hover_labels = display_labels
+            den_values = [0]*12
+            di_values = [0]*12
+
+        self.x_labels = display_labels
+        self.hover_labels = hover_labels
+        self.x_num = np.arange(len(display_labels))
+        self.den_vals = np.array(den_values)
+        self.di_vals = np.array(di_values)
+
+        color_den = '#8A2BE2' 
+        color_di = '#00E5FF'  
+        
+        if len(self.x_num) > 3:
+            x_smooth = np.linspace(self.x_num.min(), self.x_num.max(), 300) 
+            try:
+                spl_den = make_interp_spline(self.x_num, self.den_vals, k=3)
+                y_smooth_den = np.clip(spl_den(x_smooth), 0, None)
+                spl_di = make_interp_spline(self.x_num, self.di_vals, k=3)
+                y_smooth_di = np.clip(spl_di(x_smooth), 0, None)
+            except:
+                x_smooth, y_smooth_den, y_smooth_di = self.x_num, self.den_vals, self.di_vals
+        else:
+            x_smooth, y_smooth_den, y_smooth_di = self.x_num, self.den_vals, self.di_vals
+
+        for n in range(1, 8):
+            self.axes.plot(x_smooth, y_smooth_den, color=color_den, linewidth=2 + (n*1.2), alpha=0.04, zorder=1)
+            self.axes.plot(x_smooth, y_smooth_di, color=color_di, linewidth=2 + (n*1.2), alpha=0.04, zorder=1)
+
+        self.axes.plot(x_smooth, y_smooth_den, color=color_den, linewidth=3.5, label='Công văn đến', zorder=3)
+        self.axes.plot(x_smooth, y_smooth_di, color=color_di, linewidth=3.5, label='Công văn đi', zorder=3)
+        self.axes.fill_between(x_smooth, y_smooth_den, color=color_den, alpha=0.08, zorder=2)
+        self.axes.fill_between(x_smooth, y_smooth_di, color=color_di, alpha=0.08, zorder=2)
+
+        self.scatter_den = self.axes.scatter(self.x_num, self.den_vals, facecolors=color_den, edgecolors='white', s=90, linewidths=2.5, zorder=4)
+        self.scatter_di = self.axes.scatter(self.x_num, self.di_vals, facecolors=color_di, edgecolors='white', s=90, linewidths=2.5, zorder=4)
+
+        self.axes.set_xticks(self.x_num)
+        self.axes.set_xticklabels(self.x_labels, rotation=0, ha='center', fontweight='500')
+        max_y = max(max(den_values, default=0), max(di_values, default=0))
+        self.axes.set_ylim(0, max_y * 1.25 if max_y > 0 else 10)
+        
+        self.axes.spines['top'].set_visible(False)
+        self.axes.spines['right'].set_visible(False)
+        self.axes.spines['left'].set_visible(False) 
+        self.axes.spines['bottom'].set_visible(False)
+        
+        self.axes.grid(axis='y', linestyle='-', alpha=0.3, color='#E2E8F0', zorder=0)
+        self.axes.tick_params(axis='x', colors='#A0AEC0', length=0, pad=15, labelsize=10)
+        self.axes.tick_params(axis='y', colors='#A0AEC0', length=0, pad=5, labelsize=10)
+        self.axes.margins(x=0.03, y=0)
+
+        legend = self.axes.legend(loc='upper right', frameon=True, fontsize=10, labelcolor='#4A5568', edgecolor='#F8F9FA', facecolor='#F8F9FA')
+        for line in legend.get_lines():
+            line.set_linewidth(3.5)
+
+        self.annot = self.axes.annotate(
+            "", xy=(0,0), xytext=(0, 20), textcoords="offset points",
+            bbox=dict(boxstyle="round,pad=0.6", fc="#1E1E2D", ec="none", alpha=0.9),
+            fontsize=11, fontweight='bold', color="white", ha='center', zorder=10
+        )
+        self.annot.set_visible(False)
+        self.vline = self.axes.axvline(x=0, color="#CBD5E0", linestyle="dashed", linewidth=1.5, alpha=0.8, zorder=2)
+        self.vline.set_visible(False)
+        self.draw()
+
+    def on_hover(self, event):
+        if not event.inaxes == self.axes:
+            if self.annot and self.annot.get_visible():
+                self.annot.set_visible(False)
+                self.vline.set_visible(False)
+                self.draw_idle()
+            return
+
+        min_dist_x = float('inf')
+        closest_idx = None
+        
+        for idx, x in enumerate(self.x_num):
+            dist_x = abs(x - event.xdata)
+            if dist_x < 0.4 and dist_x < min_dist_x:
+                min_dist_x = dist_x
+                closest_idx = idx
+
+        if closest_idx is not None:
+            y_den = self.den_vals[closest_idx]
+            y_di = self.di_vals[closest_idx]
+            
+            label_text = f"{self.hover_labels[closest_idx]}\n📥 Đến: {int(y_den)}   |   📤 Đi: {int(y_di)}"
+            max_y = max(y_den, y_di)
+            self.annot.xy = (self.x_num[closest_idx], max_y)
+            self.annot.set_text(label_text)
+            self.annot.set_visible(True)
+            self.vline.set_xdata([self.x_num[closest_idx]])
+            self.vline.set_visible(True)
+            if self.scatter_den: self.scatter_den.set_sizes([180 if i == closest_idx else 90 for i in range(len(self.x_num))])
+            if self.scatter_di: self.scatter_di.set_sizes([180 if i == closest_idx else 90 for i in range(len(self.x_num))])
+            self.draw_idle()
+        else:
+            if self.annot and self.annot.get_visible():
+                self.annot.set_visible(False)
+                self.vline.set_visible(False)
+                if self.scatter_den: self.scatter_den.set_sizes([90]*len(self.x_num))
+                if self.scatter_di: self.scatter_di.set_sizes([90]*len(self.x_num))
+                self.draw_idle()
+
+# ==========================================
+# GIAO DIỆN CHUNG (UI COMPONENTS)
+# ==========================================
+def create_shadow(blur_radius=30, y_offset=8, alpha=10):
+    from PyQt6.QtWidgets import QGraphicsDropShadowEffect
+    shadow = QGraphicsDropShadowEffect()
+    shadow.setBlurRadius(blur_radius)
+    shadow.setColor(QColor(0, 0, 0, alpha))
+    shadow.setOffset(0, y_offset)
+    return shadow
+
+CALENDAR_CSS = """
+    QCalendarWidget QWidget {
+        background-color: #FFFFFF;
+        border-radius: 12px;
+    }
+    QCalendarWidget QWidget#qt_calendar_navigationbar {
+        background-color: #FFFFFF;
+        border-bottom: 1px solid #EDF2F7;
+        padding: 6px;
+        min-height: 42px;
+    }
+    QCalendarWidget QToolButton {
+        color: #2D3748;
+        font-weight: 700;
+        font-size: 13px;
+        border: none;
+        border-radius: 6px;
+        padding: 4px 8px;
+    }
+    QCalendarWidget QToolButton:hover {
+        background-color: #F3F0FF;
+        color: #8A2BE2;
+    }
+    QCalendarWidget QAbstractItemView:enabled {
+        color: #2D3748;
+        background-color: #FFFFFF;
+        selection-background-color: #8A2BE2;
+        selection-color: #FFFFFF;
+        font-size: 12px;
+        outline: none;
+    }
+    QCalendarWidget QAbstractItemView:disabled { color: #CBD5E0; }
+"""
+
+class ModernDatePicker(QDateEdit):
+    def __init__(self, default_date):
+        super().__init__()
+        self.setDate(default_date)
+        self.setCalendarPopup(True)
+        self.setDisplayFormat("dd/MM/yyyy")
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setStyleSheet("""
+            QDateEdit {
+                border: 1px solid #E2E8F0;
+                border-radius: 8px;
+                padding: 6px 30px 6px 12px;
+                background-color: #FFFFFF;
+                color: #2D3748;
+                font-weight: 600;
+                font-size: 13px;
+                min-width: 115px;
+            }
+            QDateEdit:hover { border: 1px solid #8A2BE2; }
+            QDateEdit::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 28px;
+                border: none;
+                background: transparent;
+            }
+        """)
+        cal = self.calendarWidget()
+        cal.setGridVisible(False)
+        cal.setStyleSheet(CALENDAR_CSS)
+
+class ModernStatCard(QFrame):
+    def __init__(self, title, color_hex, icon_char):
+        super().__init__()
+        self.setStyleSheet("QFrame { background-color: white; border-radius: 20px; border: none; }")
+        self.setGraphicsEffect(create_shadow())
+        self.setFixedHeight(120)
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 20, 24, 20)
+        
+        lbl_title = QLabel(title)
+        lbl_title.setStyleSheet("color: #718096; font-size: 14px; font-weight: 600; border: none;")
+        
+        bot_layout = QHBoxLayout()
+        self.lbl_value = QLabel("0")
+        self.lbl_value.setStyleSheet(f"color: {color_hex}; font-size: 38px; font-weight: bold; border: none;")
+        
+        lbl_icon = QLabel(icon_char)
+        lbl_icon.setStyleSheet(f"color: {color_hex}; font-size: 28px; background-color: {color_hex}15; border-radius: 14px; padding: 12px; border: none;")
+        lbl_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl_icon.setFixedSize(56, 56)
+        
+        bot_layout.addWidget(self.lbl_value)
+        bot_layout.addStretch()
+        bot_layout.addWidget(lbl_icon)
+        
+        layout.addWidget(lbl_title)
+        layout.addLayout(bot_layout)
+
+    def update_data(self, total_val):
+        if hasattr(self, 'lbl_value') and self.lbl_value is not None:
+            self.lbl_value.setText(str(total_val))
+
+class ModernTable(QTableWidget):
+    def __init__(self, headers):
+        super().__init__(0, len(headers))
+        self.setHorizontalHeaderLabels(headers)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.setShowGrid(False)
+        self.verticalHeader().setVisible(False)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setStyleSheet("""
+            QTableWidget { background-color: white; border: none; color: #2D3748; font-size: 13px; }
+            QHeaderView::section { background-color: #F8F9FA; color: #718096; font-weight: 600; padding: 15px; border: none; border-bottom: 1px solid #E2E8F0; text-align: left; }
+            QTableWidget::item { padding: 15px; border-bottom: 1px solid #EDF2F7; }
+            QTableWidget::item:hover { background-color: #F8F9FA; }
+            QTableWidget::item:selected { background-color: #F3F0FF; color: #8A2BE2; border-radius: 8px;}
+        """)
+
+class TaskItemWidget(QFrame):
+    clicked = pyqtSignal(dict)
+    def __init__(self, task_data, is_new=False):
+        super().__init__()
+        self.task_data = task_data
+        self.lbl_badge = None
+        self.setStyleSheet("QFrame { background-color: #F8F9FA; border-radius: 12px; margin-bottom: 8px; } QFrame:hover { background-color: #EDF2F7; }")
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 12, 15, 12)
+        
+        title_layout = QHBoxLayout()
+        lbl_name = QLabel(str(task_data.get('NoiDung', 'Không có tiêu đề')))
+        lbl_name.setWordWrap(True)
+        lbl_name.setStyleSheet("font-weight: 600; color: #2D3748; font-size: 14px; border: none; background: transparent;")
+        title_layout.addWidget(lbl_name)
+        
+        if is_new:
+            self.lbl_badge = QLabel(" MỚI ")
+            self.lbl_badge.setStyleSheet("background-color: #FF4757; color: white; border-radius: 4px; font-size: 10px; font-weight: bold; padding: 2px 6px; margin-left: 5px;")
+            title_layout.addWidget(self.lbl_badge)
+        title_layout.addStretch()
+
+        ngay = task_data.get('NgayTao', '')
+        ngay_str = ngay.strftime("%d/%m/%Y") if hasattr(ngay, 'strftime') else str(ngay)[:10]
+        tt = task_data.get('TrangThai', 1)
+        if tt == 1: status = "⚪ Mới giao"
+        elif tt == 2: status = "🔵 Đang xử lý"
+        elif tt == 3: status = "🟢 Đã hoàn thành"
+        elif tt == 4: status = "🔴 Quá hạn"
+        else: status = "⚪ Chưa rõ"
+
+        lbl_det = QLabel(f"⏳ {ngay_str}   |   {status}")
+        lbl_det.setStyleSheet("font-size: 12px; color: #A0AEC0; border: none; background: transparent; margin-top: 2px;")
+        layout.addLayout(title_layout)
+        layout.addWidget(lbl_det)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            if self.lbl_badge: self.lbl_badge.hide()
+            self.clicked.emit(self.task_data)
 
 class TrangChuView(QWidget):
-    yeu_cau_thong_ke = pyqtSignal()
+    yeu_cau_mo_cong_viec = pyqtSignal(int)
+    yeu_cau_mo_cv_den = pyqtSignal(str) 
+    yeu_cau_mo_cv_di = pyqtSignal(str)  
 
     def __init__(self):
         super().__init__()
-        # Đặt font chung cho toàn bộ View
         self.setFont(QFont("Segoe UI", 10))
         self.setup_ui()
 
     def setup_ui(self):
-        # Bố cục chính theo chiều dọc (Main Layout)
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
-
-        # --- Khu vực nội dung chính (Xám nhạt) ---
+        
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setStyleSheet("QScrollArea { border: none; background-color: #F8FAFC; }") 
+        
         content_widget = QWidget()
-        content_widget.setStyleSheet("background-color: #f1f2f6;") # Màu nền xám nhạt
-        content_layout = QVBoxLayout(content_widget)
-        content_layout.setContentsMargins(20, 15, 20, 20)
-        content_layout.setSpacing(15)
+        content_widget.setStyleSheet("background-color: #F8FAFC;")
+        dash_layout = QVBoxLayout(content_widget)
+        dash_layout.setContentsMargins(40, 40, 40, 40)
+        dash_layout.setSpacing(35)
 
-        # =========================================================================
-        # 1. Hàng Card Thống Kê (Statistics Row)
-        # =========================================================================
-        cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(15)
-
-        # Khởi tạo các Card với màu sắc và icon
-        self.card_den = self._create_colorful_card("📥", "CÔNG VĂN ĐẾN CT ABC (2026)", "5", "#ff6b6b")
-        self.card_di = self._create_colorful_card("📤", "CÔNG VĂN ĐI CT ABC (2026)", "5", "#a55eea")
-        self.card_ho_so = self._create_colorful_card("📁", "DANH MỤC HỒ SƠ ABC", "0", "#f0932b")
-        self.card_nhiem_vu = self._create_colorful_card("📊", "NHIỆM VỤ - THÔNG BÁO", "3", "#00cec9")
-
-        cards_layout.addWidget(self.card_den)
-        cards_layout.addWidget(self.card_di)
-        cards_layout.addWidget(self.card_ho_so)
-        cards_layout.addWidget(self.card_nhiem_vu)
-        content_layout.addLayout(cards_layout)
-
-        # =========================================================================
-        # 2. Khu vực chia tách (Split Area)
-        # =========================================================================
-        split_layout = QHBoxLayout()
-        split_layout.setSpacing(15)
-
-        # --- Khu vực TRÁI: Hai khung danh sách Công văn ---
-        list_v_layout = QVBoxLayout()
-        list_v_layout.setSpacing(15)
-
-        # Khung Công văn Đến
-        self.frame_den = self._create_list_frame("📋 Công văn đến mới nhất CT ABC", "Cập nhật: 08/04/2026")
-        self.table_den = self.frame_den.findChild(QTableWidget)
-        list_v_layout.addWidget(self.frame_den)
-
-        # Khung Công văn Đi
-        self.frame_di = self._create_list_frame("📤 Công văn đi mới nhất CT ABC", "Cập nhật: 19/04/2026")
-        self.table_di = self.frame_di.findChild(QTableWidget)
-        list_v_layout.addWidget(self.frame_di)
-
-        split_layout.addLayout(list_v_layout, stretch=3)
-
-        # --- Khu vực PHẢI: Các ô thông tin nhiệm vụ/sự kiện ---
-        right_info_layout = QVBoxLayout()
-        right_info_layout.setSpacing(10)
-        right_info_layout.setContentsMargins(0, 0, 0, 0)
+        # 1. THỂ THỐNG KÊ (ĐÃ BỔ SUNG VĂN BẢN NỘI BỘ THÀNH 4 THẺ)
+        row1 = QHBoxLayout()
+        row1.setSpacing(20) # Giảm khoảng cách để 4 thẻ hiển thị đều đẹp
+        self.card_den = ModernStatCard("CÔNG VĂN ĐẾN", "#8A2BE2", "📥")
+        self.card_di = ModernStatCard("CÔNG VĂN ĐI", "#00E5FF", "📤")
+        self.card_noibo = ModernStatCard("VĂN BẢN NỘI BỘ", "#F59E0B", "📁") 
+        self.card_congviec = ModernStatCard("TỔNG CÔNG VIỆC", "#14B8A6", "📋")
         
-        # Ô Sự kiện
-        self.box_events = self._create_info_box("Sự kiện diễn ra (0 sự kiện)", "#27ae60")
-        lbl_event_content = QLabel("Hôm nay không có sự kiện nào được lịch hẹn.")
-        lbl_event_content.setStyleSheet("color: #7f8c8d; padding: 5px; border: none;")
-        self.box_events.layout().addWidget(lbl_event_content)
-        right_info_layout.addWidget(self.box_events)
+        row1.addWidget(self.card_den)
+        row1.addWidget(self.card_di)
+        row1.addWidget(self.card_noibo)
+        row1.addWidget(self.card_congviec)
+        dash_layout.addLayout(row1)
 
-        # Ô Sinh nhật
-        self.box_birthdays = self._create_info_box("Thông báo sinh nhật (0 cán bộ)", "#2ecc71")
-        lbl_bday_content = QLabel("Hôm nay không có ai sinh nhật.")
-        lbl_bday_content.setStyleSheet("color: #7f8c8d; padding: 5px; border: none;")
-        self.box_birthdays.layout().addWidget(lbl_bday_content)
-        right_info_layout.addWidget(self.box_birthdays)
-
-        # Ô Nhiệm vụ mới
-        self.box_new_tasks = self._create_info_box("Nhiệm vụ mới (0 công việc)", "#e67e22")
-        right_info_layout.addWidget(self.box_new_tasks)
-
-        right_info_layout.addStretch()
-        split_layout.addLayout(right_info_layout, stretch=1)
-
-        content_layout.addLayout(split_layout, stretch=1)
-
-        # =========================================================================
-        # 3. Bảng Nhiệm vụ cần xử lý dưới cùng
-        # =========================================================================
-        task_header = QFrame()
-        task_header.setFixedHeight(30)
-        task_header.setStyleSheet("background-color: #0c2461; border-top-left-radius: 8px; border-top-right-radius: 8px;")
-        h_layout_task = QHBoxLayout(task_header)
-        h_layout_task.setContentsMargins(10, 0, 10, 0)
-        lbl_task_title = QLabel("✅ Danh sách nhiệm vụ trong năm 2026 cần xử lý")
-        lbl_task_title.setStyleSheet("color: white; font-weight: bold; border: none;")
-        btn_more_task = QPushButton("Xem thêm »")
-        btn_more_task.setStyleSheet("color: #a4b0be; background: none; border: none; font-size: 11px;")
-        h_layout_task.addWidget(lbl_task_title)
-        h_layout_task.addStretch()
-        h_layout_task.addWidget(btn_more_task)
+        # 2. LINE CHART & TASKS PANEL
+        row2 = QHBoxLayout()
+        row2.setSpacing(30)
         
-        content_layout.addWidget(task_header)
-
-        self.table_task = QTableWidget()
-        self.table_task.setColumnCount(4)
-        self.table_task.setHorizontalHeaderLabels(["Công việc", "Hạn xử lý", "Trạng thái", "Liên quan"])
-        self.table_task.setStyleSheet("""
-            QTableWidget {
-                background-color: white;
-                border: 1px solid #dcdde1;
-                border-top: none;
-                gridline-color: white;
-                border-bottom-left-radius: 8px;
-                border-bottom-right-radius: 8px;
-            }
-            QTableWidget::item { padding: 5px; border-bottom: 1px solid #f1f2f6; }
-            QHeaderView::section { background-color: #f8f9fa; font-weight: bold; border: 1px solid #f1f2f6; }
-        """)
-        self.table_task.horizontalHeader().setStretchLastSection(True)
-        self.table_task.verticalHeader().setVisible(False)
-        self.table_task.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.table_task.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        content_layout.addWidget(self.table_task)
-
-        # Nút làm mới dữ liệu
-        footer_layout = QHBoxLayout()
-        btn_refresh = QPushButton("🔄 Cập nhật thống kê hệ thống ABC")
-        btn_refresh.setFixedSize(220, 35)
-        btn_refresh.setStyleSheet("""
-            background-color: #1e3799; 
-            color: white; 
-            border-radius: 5px; 
-            font-weight: bold; 
-            font-size: 13px;
-        """)
-        btn_refresh.clicked.connect(self.yeu_cau_thong_ke.emit)
-        footer_layout.addWidget(btn_refresh, alignment=Qt.AlignmentFlag.AlignRight)
-        content_layout.addLayout(footer_layout)
-
-        main_layout.addWidget(content_widget)
-
-    # --- Helper: Tạo Card màu sắc thống kê ---
-    def _create_colorful_card(self, icon_char, title, value, color):
-        card = QFrame()
-        card.setFixedHeight(120)
-        card.setStyleSheet(f"""
-            background-color: {color};
-            border-radius: 12px;
-            color: white;
-        """)
-        grid_layout = QGridLayout(card)
-        grid_layout.setContentsMargins(15, 10, 15, 10)
-        grid_layout.setSpacing(0)
-
-        lbl_title = QLabel(title)
-        lbl_title.setStyleSheet("font-size: 13px; font-weight: normal; color: rgba(255,255,255,0.8); border: none;")
+        chart_frame = QFrame()
+        chart_frame.setStyleSheet("background-color: white; border-radius: 20px; border: none;")
+        chart_frame.setGraphicsEffect(create_shadow())
         
-        lbl_value = QLabel(value)
-        lbl_value.setStyleSheet("font-size: 40px; font-weight: bold; border: none;")
-        lbl_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        chart_layout = QVBoxLayout(chart_frame)
+        chart_layout.setContentsMargins(30, 25, 30, 15) 
+        chart_layout.setSpacing(15) 
         
-        lbl_icon = QLabel(icon_char)
-        lbl_icon.setStyleSheet("font-size: 50px; color: rgba(255,255,255,0.4); border: none;")
-        lbl_icon.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-
-        grid_layout.addWidget(lbl_title, 0, 0, 1, 1)
-        grid_layout.addWidget(lbl_value, 1, 0, 1, 1)
-        grid_layout.addWidget(lbl_icon, 0, 1, 2, 1)
-
-        card.value_label = lbl_value
-        return card
-
-    # --- Helper: Tạo Khung danh sách công văn ---
-    def _create_list_frame(self, title, update_time_str):
-        frame = QFrame()
-        frame.setStyleSheet("background-color: white; border: 1px solid #dcdde1; border-radius: 8px;")
-        v_layout = QVBoxLayout(frame)
-        v_layout.setContentsMargins(0, 0, 0, 0)
-        v_layout.setSpacing(0)
-
-        header_widget = QWidget()
-        header_widget.setFixedHeight(35)
-        header_widget.setStyleSheet("background-color: #1e90ff; border-top-left-radius: 8px; border-top-right-radius: 8px; border: none;")
-        header_layout = QHBoxLayout(header_widget)
-        header_layout.setContentsMargins(10, 0, 10, 0)
-
-        lbl_title = QLabel(title)
-        lbl_title.setStyleSheet("color: white; font-weight: bold; font-size: 13px; border: none;")
-        lbl_update = QLabel(update_time_str)
-        lbl_update.setStyleSheet("color: rgba(255,255,255,0.7); font-size: 11px; border: none;")
+        chart_header = QHBoxLayout()
+        chart_header.setContentsMargins(0, 0, 0, 15) 
         
-        header_layout.addWidget(lbl_title)
-        header_layout.addStretch()
-        header_layout.addWidget(lbl_update)
-        v_layout.addWidget(header_widget)
+        lbl_chart = QLabel("Tổng quan biến động công văn")
+        lbl_chart.setStyleSheet("font-size: 16px; font-weight: 800; color: #2D3748; border: none;")
+        
+        filter_layout = QHBoxLayout()
+        filter_layout.setContentsMargins(0, 0, 0, 0)
+        filter_layout.setSpacing(10)
+        
+        self.date_from = ModernDatePicker(QDate.currentDate().addMonths(-3))
+        self.date_to = ModernDatePicker(QDate.currentDate())
+        
+        filter_layout.addWidget(QLabel("Từ:"))
+        filter_layout.addWidget(self.date_from)
+        filter_layout.addWidget(QLabel("Đến:"))
+        filter_layout.addWidget(self.date_to)
+        filter_layout.addStretch()
+        
+        chart_header.addWidget(lbl_chart)
+        chart_header.addStretch()
+        chart_header.addLayout(filter_layout)
+        
+        self.line_chart = LineChart()
+        chart_layout.addLayout(chart_header)
+        chart_layout.addWidget(self.line_chart)
+        row2.addWidget(chart_frame, stretch=7) 
+        
+        noti_frame = QFrame()
+        noti_frame.setStyleSheet("background-color: white; border-radius: 20px; border: none;")
+        noti_frame.setGraphicsEffect(create_shadow())
+        self.noti_layout = QVBoxLayout(noti_frame)
+        self.noti_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.noti_layout.setContentsMargins(25, 25, 25, 25)
+        
+        lbl_noti = QLabel("Công việc mới")
+        lbl_noti.setStyleSheet("font-size: 16px; font-weight: 700; color: #2D3748; border: none; padding-bottom: 15px;")
+        self.noti_layout.addWidget(lbl_noti)
+        
+        row2.addWidget(noti_frame, stretch=3)
+        dash_layout.addLayout(row2)
 
-        table = QTableWidget()
-        table.setColumnCount(3)
-        table.verticalHeader().setVisible(False)
-        table.horizontalHeader().setVisible(False)
-        table.setStyleSheet("QTableWidget { border: none; background-color: white; gridline-color: white; }")
-        table.horizontalHeader().setStretchLastSection(True)
-        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        v_layout.addWidget(table, stretch=1)
+        # 3. TOP 5 TABLES
+        row3 = QHBoxLayout()
+        row3.setSpacing(30)
+        
+        tb_den_frame = QFrame()
+        tb_den_frame.setStyleSheet("background-color: white; border-radius: 20px; border: none;")
+        tb_den_frame.setGraphicsEffect(create_shadow())
+        tb_den_layout = QVBoxLayout(tb_den_frame)
+        tb_den_layout.setContentsMargins(25, 25, 25, 25)
+        lbl_tb_den = QLabel("Công văn đến mới nhất")
+        lbl_tb_den.setStyleSheet("font-size: 16px; font-weight: 700; color: #2D3748; border: none; padding-bottom: 15px;")
+        self.tb_den = ModernTable(["Ký hiệu", "Ngày", "Trích yếu"])
+        self.tb_den.itemDoubleClicked.connect(self._on_den_double_click)
+        tb_den_layout.addWidget(lbl_tb_den)
+        tb_den_layout.addWidget(self.tb_den)
+        row3.addWidget(tb_den_frame)
+        
+        tb_di_frame = QFrame()
+        tb_di_frame.setStyleSheet("background-color: white; border-radius: 20px; border: none;")
+        tb_di_frame.setGraphicsEffect(create_shadow())
+        tb_di_layout = QVBoxLayout(tb_di_frame)
+        tb_di_layout.setContentsMargins(25, 25, 25, 25)
+        lbl_tb_di = QLabel("Công văn đi mới nhất")
+        lbl_tb_di.setStyleSheet("font-size: 16px; font-weight: 700; color: #2D3748; border: none; padding-bottom: 15px;")
+        self.tb_di = ModernTable(["Ký hiệu", "Ngày", "Nơi nhận"])
+        self.tb_di.itemDoubleClicked.connect(self._on_di_double_click)
+        tb_di_layout.addWidget(lbl_tb_di)
+        tb_di_layout.addWidget(self.tb_di)
+        row3.addWidget(tb_di_frame)
+        
+        dash_layout.addLayout(row3)
+        scroll_area.setWidget(content_widget)
+        main_layout.addWidget(scroll_area)
 
-        footer_widget = QWidget()
-        footer_widget.setFixedHeight(25)
-        footer_layout = QHBoxLayout(footer_widget)
-        footer_layout.setContentsMargins(10, 0, 10, 0)
-        btn_more = QPushButton("Xem thêm »")
-        btn_more.setStyleSheet("color: #1e90ff; background: none; border: none; font-size: 11px; text-align: left;")
-        footer_layout.addWidget(btn_more)
-        v_layout.addWidget(footer_widget)
+    def _on_task_clicked(self, task_data):
+        self.yeu_cau_mo_cong_viec.emit(task_data.get('Id', 0))
+    def _on_den_double_click(self, item):
+        self.yeu_cau_mo_cv_den.emit(self.tb_den.item(item.row(), 0).text())
+    def _on_di_double_click(self, item):
+        self.yeu_cau_mo_cv_di.emit(self.tb_di.item(item.row(), 0).text())
 
-        return frame
+    def update_task_panel(self, tasks):
+        for i in reversed(range(1, self.noti_layout.count())): 
+            widget = self.noti_layout.itemAt(i).widget()
+            if widget: widget.setParent(None)
+        if not tasks:
+            lbl_empty = QLabel("Chưa có công việc nào.")
+            lbl_empty.setStyleSheet("color: #A0AEC0; font-style: italic; font-size: 13px;")
+            self.noti_layout.addWidget(lbl_empty)
+            return
+        
+        for t in tasks[:5]: 
+            is_new = (t.get('TrangThai', 1) == 1)
+            t_widget = TaskItemWidget(t, is_new)
+            t_widget.clicked.connect(self._on_task_clicked)
+            self.noti_layout.addWidget(t_widget)
 
-    # --- Helper: Tạo ô thông tin nhỏ bên phải ---
-    def _create_info_box(self, title, color):
-        box = QFrame()
-        box.setStyleSheet("background-color: white; border: 1px solid #dcdde1; border-radius: 8px;")
-        v_layout = QVBoxLayout(box)
-        v_layout.setContentsMargins(0, 0, 0, 0)
-        v_layout.setSpacing(0)
+    def update_table_den(self, data_list):
+        self.tb_den.setRowCount(len(data_list))
+        for i, row in enumerate(data_list):
+            self.tb_den.setItem(i, 0, QTableWidgetItem(str(row.get('so_ky_hieu', row.get('KyHieu', '')))))
+            ngay = row.get('ngay_den', row.get('NgayDen', ''))
+            ngay_str = ngay.strftime("%d/%m/%Y") if hasattr(ngay, 'strftime') else str(ngay)[:10]
+            self.tb_den.setItem(i, 1, QTableWidgetItem(ngay_str))
+            self.tb_den.setItem(i, 2, QTableWidgetItem(str(row.get('trich_yeu', row.get('TrichYeu', '')))))
 
-        header = QLabel(f"  🟢 {title}")
-        header.setFixedHeight(30)
-        header.setStyleSheet(f"background-color: {color}; color: white; font-weight: bold; border-top-left-radius: 8px; border-top-right-radius: 8px; border: none;")
-        v_layout.addWidget(header)
-        return box
-
-    # --- Cập nhật dữ liệu cho Card ---
-    def update_thong_ke(self, den, di, ho_so, nhiem_vu):
-        self.card_den.value_label.setText(str(den))
-        self.card_di.value_label.setText(str(di))
-        self.card_ho_so.value_label.setText(str(ho_so))
-        self.card_nhiem_vu.value_label.setText(str(nhiem_vu))
-
-    # --- Cập nhật danh sách CV Đến ---
-    def update_danh_sach_den(self, danh_sach):
-        self.table_den.setRowCount(len(danh_sach))
-        for i, item in enumerate(danh_sach):
-            self.table_den.setItem(i, 0, QTableWidgetItem(f"SỐ KÝ HIỆU: {item.get('so_ky_hieu', '')}"))
-            ngay_den = item.get('ngay_den', '')
-            ngay_den_str = ngay_den.strftime("%d/%m/%Y") if hasattr(ngay_den, 'strftime') else str(ngay_den)
-            self.table_den.setItem(i, 1, QTableWidgetItem(ngay_den_str))
-            trich_yeu = str(item.get('trich_yeu', ''))
-            if len(trich_yeu) > 50: trich_yeu = trich_yeu[:50] + '...'
-            item_trich_yeu = QTableWidgetItem(trich_yeu)
-            item_trich_yeu.setForeground(Qt.GlobalColor.blue)
-            self.table_den.setItem(i, 2, item_trich_yeu)
-        self.table_den.resizeColumnsToContents()
-
-    # --- Cập nhật danh sách CV Đi ---
-    def update_danh_sach_di(self, danh_sach):
-        self.table_di.setRowCount(len(danh_sach))
-        for i, item in enumerate(danh_sach):
-            self.table_di.setItem(i, 0, QTableWidgetItem(f"SỐ KÝ HIỆU: {item.get('so_ky_hieu', '')}"))
-            ngay_vb = item.get('ngay_van_ban', '')
-            ngay_vb_str = ngay_vb.strftime("%d/%m/%Y") if hasattr(ngay_vb, 'strftime') else str(ngay_vb)
-            self.table_di.setItem(i, 1, QTableWidgetItem(ngay_vb_str))
-            noi_nhan = str(item.get('noi_nhan', ''))
-            if len(noi_nhan) > 40: noi_nhan = noi_nhan[:40] + '...'
-            item_noi_nhan = QTableWidgetItem(noi_nhan)
-            item_noi_nhan.setForeground(Qt.GlobalColor.darkBlue)
-            self.table_di.setItem(i, 2, item_noi_nhan)
-        self.table_di.resizeColumnsToContents()
-
-    # --- Cập nhật danh sách Nhiệm vụ ---
-    def update_nhiem_vu(self, danh_sach):
-        self.table_task.setRowCount(len(danh_sach))
-        for i, nv in enumerate(danh_sach):
-            self.table_task.setItem(i, 0, QTableWidgetItem(str(nv.get('tieu_de', ''))))
-            han = nv.get('han_hoan_thanh', '')
-            han_str = han.strftime("%d/%m/%Y") if hasattr(han, 'strftime') else str(han)
-            self.table_task.setItem(i, 1, QTableWidgetItem(han_str))
-            trang_thai = str(nv.get('trang_thai', ''))
-            item_status = QTableWidgetItem(trang_thai)
-            if "Đang xử lý" in trang_thai: item_status.setForeground(Qt.GlobalColor.darkYellow)
-            elif "Chưa xử lý" in trang_thai: item_status.setForeground(Qt.GlobalColor.darkRed)
-            elif "Đã hoàn thành" in trang_thai: item_status.setForeground(Qt.GlobalColor.darkGreen)
-            self.table_task.setItem(i, 2, item_status)
-            self.table_task.setItem(i, 3, QTableWidgetItem(str(nv.get('lien_quan', ''))))
-        self.table_task.resizeColumnsToContents()
+    def update_table_di(self, data_list):
+        self.tb_di.setRowCount(len(data_list))
+        for i, row in enumerate(data_list):
+            self.tb_di.setItem(i, 0, QTableWidgetItem(str(row.get('KyHieu', ''))))
+            ngay = row.get('NgayKy', '')
+            ngay_str = ngay.strftime("%d/%m/%Y") if hasattr(ngay, 'strftime') else str(ngay)[:10]
+            self.tb_di.setItem(i, 1, QTableWidgetItem(ngay_str))
+            self.tb_di.setItem(i, 2, QTableWidgetItem(str(row.get('NoiNhan', ''))))

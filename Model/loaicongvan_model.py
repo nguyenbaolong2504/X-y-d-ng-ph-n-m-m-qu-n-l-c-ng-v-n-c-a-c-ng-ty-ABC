@@ -6,16 +6,21 @@ class LoaiCongVanModel:
         self.conn_str = connection_string
 
     def get_all(self, trang_thai=None):
-        """Lấy danh sách loại công văn, nếu trang_thai được chỉ định thì lọc theo đó (1: đến, 2: đi)"""
+        """Lấy danh sách loại công văn (1: đến, 2: đi, 3: dùng chung cho cả 2)"""
         try:
             with pyodbc.connect(self.conn_str) as conn:
                 cursor = conn.cursor()
-                if trang_thai is not None:
-                    sql = "SELECT Id, MaLoai, TenLoai, MoTa, TrangThai, NgayTao FROM dbo.LoaiCongVan WHERE TrangThai = ? ORDER BY Id ASC"
-                    cursor.execute(sql, (trang_thai,))
+                if trang_thai == 1:
+                    sql = "SELECT Id, MaLoai, TenLoai, MoTa, TrangThai, NgayTao FROM dbo.LoaiCongVan WHERE TrangThai IN (1, 3) ORDER BY Id ASC"
+                    cursor.execute(sql)
+                elif trang_thai == 2:
+                    # Lấy loại ĐI (2) và DÙNG CHUNG (3)
+                    sql = "SELECT Id, MaLoai, TenLoai, MoTa, TrangThai, NgayTao FROM dbo.LoaiCongVan WHERE TrangThai IN (2, 3) ORDER BY Id ASC"
+                    cursor.execute(sql)
                 else:
                     sql = "SELECT Id, MaLoai, TenLoai, MoTa, TrangThai, NgayTao FROM dbo.LoaiCongVan ORDER BY Id ASC"
                     cursor.execute(sql)
+                
                 columns = [column[0] for column in cursor.description]
                 return [dict(zip(columns, row)) for row in cursor.fetchall()]
         except pyodbc.Error as e:

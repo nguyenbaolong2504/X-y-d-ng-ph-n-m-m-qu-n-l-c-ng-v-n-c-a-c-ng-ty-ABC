@@ -35,6 +35,7 @@ class CongVanController:
         ]
 
     def nap_danh_muc(self):
+        # 1. Nạp danh sách cán bộ xử lý
         try:
             ds_can_bo = self.model.get_danh_sach_can_bo()
             if hasattr(self.view, 'set_nhan_su_list') and ds_can_bo:
@@ -43,11 +44,15 @@ class CongVanController:
         except Exception as e:
             self._handle_error(f"Lỗi nạp danh sách cán bộ: {str(e)}")
 
+        # 2. Nạp danh sách Loại văn bản đến từ Database (SỬA TẠI ĐÂY)
         try:
-            conn_str = getattr(self.model, 'connection_string', None) or getattr(self.model, 'conn_str', None)
+            # Lấy chuỗi kết nối an toàn từ model
+            conn_str = getattr(self.model, 'conn_str', None) or getattr(self.model, 'connection_string', None)
+            
             if conn_str:
-                loai_cv_model = LoaiCongVanModel(connection_string=conn_str)
-                ds_loai_cv = loai_cv_model.get_all(trang_thai=1)
+                loai_cv_model = LoaiCongVanModel(conn_str)
+                ds_loai_cv = loai_cv_model.get_all(trang_thai=1) # Lấy loại Đến (1) và Dùng chung (3)
+                
                 if hasattr(self.view, 'set_loai_van_ban_list') and ds_loai_cv:
                     danh_sach_loai = [{
                         'id': x.get('Id'), 
@@ -57,18 +62,6 @@ class CongVanController:
                         'TenLoai': x.get('TenLoai')
                     } for x in ds_loai_cv]
                     self.view.set_loai_van_ban_list(danh_sach_loai)
-            else:
-                if hasattr(self.model, 'get_loai_van_ban'):
-                    ds_loai_cv = self.model.get_loai_van_ban()
-                    if hasattr(self.view, 'set_loai_van_ban_list') and ds_loai_cv:
-                        danh_sach_loai = [{
-                            'id': x.get('id'), 
-                            'Id': x.get('id'), 
-                            'ten': x.get('ten_loai'), 
-                            'ten_loai': x.get('ten_loai'), 
-                            'TenLoai': x.get('ten_loai')
-                        } for x in ds_loai_cv]
-                        self.view.set_loai_van_ban_list(danh_sach_loai)
         except Exception as e:
             self._handle_error(f"Lỗi nạp danh mục loại văn bản: {str(e)}")
 

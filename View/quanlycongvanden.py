@@ -14,6 +14,7 @@ class MainWindow(QMainWindow):
     xuat_excel_signal = pyqtSignal()
     nap_dulieu_signal = pyqtSignal()
     giao_viec_signal = pyqtSignal(int) 
+    nap_danh_muc_signal = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -187,6 +188,7 @@ class MainWindow(QMainWindow):
         self.giao_viec_signal.emit(row_data["id"])
 
     def open_them_dialog(self):
+        self.nap_danh_muc_signal.emit()
         dialog = QDialog(self)
         dialog.setWindowTitle("Tiếp nhận Công văn Đến")
         dialog.setFixedWidth(680)
@@ -289,6 +291,7 @@ class MainWindow(QMainWindow):
         row_data = self.table_view.model().get_row(index.row())
         if not row_data: return
 
+        self.nap_danh_muc_signal.emit()
         dialog = QDialog(self)
         dialog.setWindowTitle(f"Chỉnh sửa Văn bản - ID: {row_data.get('id')}")
         dialog.setFixedWidth(680)

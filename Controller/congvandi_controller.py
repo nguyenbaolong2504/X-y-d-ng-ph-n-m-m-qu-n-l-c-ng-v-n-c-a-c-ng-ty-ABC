@@ -39,10 +39,10 @@ class CongVanDiController:
     def nap_danh_muc(self):
         conn_str = self.model.conn_str
 
-        # 1. Loại văn bản
+        # 1. Loại văn bản đi từ Database
         try:
             lcv_model = LoaiCongVanModel(conn_str)
-            ds_loai = lcv_model.get_all(trang_thai=2)
+            ds_loai = lcv_model.get_all(trang_thai=2) # Lấy loại Đi (2) và Dùng chung (3)
             loai_list = [{
                 'id': item.get('Id'),
                 'Id': item.get('Id'),
@@ -55,12 +55,12 @@ class CongVanDiController:
         except Exception as e:
             print(f"Lỗi nạp loại văn bản: {e}")
 
-        # 2. Đơn vị - dùng bảng DonViTruThuoc
+        # 2. Đơn vị - dùng bảng DonViTrucThuoc (Đã sửa lỗi chính tả chữ 'c')
         donvi_list = []
         try:
             with pyodbc.connect(conn_str) as conn:
                 cursor = conn.cursor()
-                cursor.execute("SELECT Id, TenDonVi FROM DonViTruThuoc ORDER BY TenDonVi")
+                cursor.execute("SELECT Id, TenDonVi FROM DonViTrucThuoc ORDER BY TenDonVi")
                 donvi_list = [{'id': row[0], 'ten_don_vi': row[1]} for row in cursor.fetchall()]
         except Exception as e:
             print(f"Lỗi nạp đơn vị: {e}")

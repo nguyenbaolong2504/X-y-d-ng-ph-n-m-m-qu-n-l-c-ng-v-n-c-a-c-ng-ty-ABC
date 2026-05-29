@@ -11,28 +11,31 @@ class CongViecModel:
     def get_cong_viec_cua_toi(self, nguoi_dung_id, vai_tro):
         conn = self._get_connection()
         cursor = conn.cursor()
-        if vai_tro == "Giám đốc":
+        
+        # Gộp Admin và Giám đốc thành nhóm có quyền xem toàn bộ công việc
+        if vai_tro in ["Giám đốc", "Admin"]:
             sql = """
                 SELECT pc.Id, pc.NoiDung, cb_g.HoTen AS NguoiGiao, cb_n.HoTen AS NguoiNhan,
                        pc.TrangThai, pc.HanXuLy, pc.NgayTao
                 FROM PhanCongXuLy pc
-                JOIN CanBo cb_g ON pc.NguoiGiaoId = cb_g.Id
-                JOIN CanBo cb_n ON pc.NguoiDuocGiaoId = cb_n.Id
-                WHERE pc.TrangThai IN (1, 2, 3)
+                LEFT JOIN CanBo cb_g ON pc.NguoiGiaoId = cb_g.Id
+                LEFT JOIN CanBo cb_n ON pc.NguoiDuocGiaoId = cb_n.Id
                 ORDER BY pc.NgayTao DESC
             """
             cursor.execute(sql)
         else:
+            # Các vai trò khác (Trưởng phòng, Nhân viên) chỉ xem việc của mình (nhận hoặc giao)
             sql = """
                 SELECT pc.Id, pc.NoiDung, cb_g.HoTen AS NguoiGiao, cb_n.HoTen AS NguoiNhan,
                        pc.TrangThai, pc.HanXuLy, pc.NgayTao
                 FROM PhanCongXuLy pc
-                JOIN CanBo cb_g ON pc.NguoiGiaoId = cb_g.Id
-                JOIN CanBo cb_n ON pc.NguoiDuocGiaoId = cb_n.Id
+                LEFT JOIN CanBo cb_g ON pc.NguoiGiaoId = cb_g.Id
+                LEFT JOIN CanBo cb_n ON pc.NguoiDuocGiaoId = cb_n.Id
                 WHERE pc.NguoiDuocGiaoId = ? OR pc.NguoiGiaoId = ?
                 ORDER BY pc.NgayTao DESC
             """
             cursor.execute(sql, (nguoi_dung_id, nguoi_dung_id))
+            
         rows = cursor.fetchall()
         conn.close()
         return rows
@@ -92,7 +95,6 @@ class CongViecModel:
         conn.close()
 
     def cap_nhat_ngay_nop(self, cv_id):
-        """Cập nhật thời điểm nộp báo cáo (khi upload file)"""
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
@@ -112,7 +114,7 @@ class CongViecModel:
         cv_den_id = row[0]
         thoi_gian = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute("""
-            INSERT INTO LichSuXuLy (CongVanDenId, NguoiThucHienId, ThoiGian, HanhDong, ChiTiet)
+            INSERT INTO LichSuXuLy (CongVanDenId, NguoiThuChienId, ThaiGian, HanhDong, ChiTiet)
             VALUES (?, ?, ?, ?, ?)
         """, (cv_den_id, nguoi_id, thoi_gian, hanh_dong, chi_tiet))
         conn.commit()
@@ -122,18 +124,17 @@ class CongViecModel:
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT ls.HanhDong, ls.ChiTiet, ls.ThoiGian, cb.HoTen
+            SELECT ls.HanhDong, ls.ChiTiet, ls.ThaiGian, cb.HoTen
             FROM LichSuXuLy ls
-            JOIN CanBo cb ON ls.NguoiThucHienId = cb.Id
+            JOIN CanBo cb ON ls.NguoiThuChienId = cb.Id
             WHERE ls.CongVanDenId = (SELECT CongVanDenId FROM PhanCongXuLy WHERE Id = ?)
-            ORDER BY ls.ThoiGian
+            ORDER BY ls.ThaiGian
         """, cv_id)
         rows = cursor.fetchall()
         conn.close()
         return rows
 
     def get_file_chung(self, cv_id):
-        """Lấy file báo cáo mới nhất từ bất kỳ công việc nào có cùng CongVanDenId"""
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
@@ -147,18 +148,17 @@ class CongViecModel:
         return row[0] if row else None
 
     def get_phan_hoi_moi_cho_nguoi(self, nguoi_dung_id):
-        """Lấy phản hồi mới (7 ngày) cho user (cả người giao và người nhận)"""
         conn = self._get_connection()
         cursor = conn.cursor()
         sql = """
-            SELECT pc.Id, pc.NoiDung, ls.HanhDong, ls.ChiTiet, ls.ThoiGian, cb.HoTen as NguoiPhanHoi
+            SELECT pc.Id, pc.NoiDung, ls.HanhDong, ls.ChiTiet, ls.ThaiGian, cb.HoTen as NguoiPhanHoi
             FROM PhanCongXuLy pc
             JOIN LichSuXuLy ls ON ls.CongVanDenId = pc.CongVanDenId
-            JOIN CanBo cb ON ls.NguoiThucHienId = cb.Id
+            JOIN CanBo cb ON ls.NguoiThuChienId = cb.Id
             WHERE (pc.NguoiDuocGiaoId = ? OR pc.NguoiGiaoId = ?)
               AND ls.HanhDong = 'Phản hồi'
-              AND ls.ThoiGian > DATEADD(day, -7, GETDATE())
-            ORDER BY ls.ThoiGian DESC
+              AND ls.ThaiGian > DATEADD(day, -7, GETDATE())
+            ORDER BY ls.ThaiGian DESC
         """
         cursor.execute(sql, (nguoi_dung_id, nguoi_dung_id))
         rows = cursor.fetchall()
@@ -166,6 +166,9 @@ class CongViecModel:
         return rows
 
 
+# =======================================================
+# KHÔI PHỤC LẠI 2 CLASS BỊ MẤT
+# =======================================================
 class CongVanDenModel:
     def __init__(self, conn_str):
         self.conn_str = conn_str
@@ -177,7 +180,6 @@ class CongVanDenModel:
         rows = cursor.fetchall()
         conn.close()
         return rows
-
 
 class CongVanDiModel:
     def __init__(self, conn_str):

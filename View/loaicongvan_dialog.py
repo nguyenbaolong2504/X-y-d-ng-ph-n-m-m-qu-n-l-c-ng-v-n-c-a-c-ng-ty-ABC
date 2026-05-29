@@ -6,7 +6,8 @@ class LoaiCongVanDialog(QDialog):
     def __init__(self, title="Cập nhật Loại công văn", data=None, default_trangthai=1):
         super().__init__()
         self.data = data
-        self.trangthai_hidden = default_trangthai
+        self.trangthai_hidden = default_trangthai 
+        
         self.setWindowTitle(title)
         self.setFixedWidth(450)
         self.setup_ui()
@@ -78,7 +79,7 @@ class LoaiCongVanDialog(QDialog):
         self.txt_ma.setText(str(self.data.get('MaLoai', '') or ''))
         self.txt_ten.setText(str(self.data.get('TenLoai', '')))
         self.txt_mota.setPlainText(str(self.data.get('MoTa', '') or ''))
-        self.trangthai_hidden = self.data.get('TrangThai', 1)
+        self.trangthai_hidden = self.data.get('TrangThai', self.trangthai_hidden)
 
     def get_data(self):
         res = {

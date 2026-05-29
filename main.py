@@ -1,14 +1,12 @@
 import sys, os, pyodbc
 _original_pyodbc_connect = pyodbc.connect
 def _intercept_connect(*args, **kwargs):
-    # TRẢ VỀ LOCALHOST VÌ MÁY BẠN DÙNG TÊN NÀY MỚI CHẠY ĐƯỢC
     my_local_conn_str = ( 
         "DRIVER={ODBC Driver 17 for SQL Server};" 
-        "SERVER=localhost\\SQLEXPRESS;" 
+        "SERVER=localhost;"   # <--- CHỈ CẦN GHI LÀ ADMIN (XÓA CHỮ localhost\SQLEXPRESS ĐI)
         "DATABASE=congtyabc;" 
         "Trusted_Connection=yes;" 
         )
-
     return _original_pyodbc_connect(my_local_conn_str)
 
 pyodbc.connect = _intercept_connect
@@ -322,6 +320,9 @@ class MainApp(QMainWindow):
             self.tab_home = TrangChuView()
             self.home_controller = TrangChuController(self.tab_home, self.user_session)
             self.stacked_widget.addWidget(self.tab_home)
+            self.tab_home.yeu_cau_mo_cv_den.connect(self.chuyen_den_tab_cv_den)
+            self.tab_home.yeu_cau_mo_cv_di.connect(self.chuyen_den_tab_cv_di)
+            self.tab_home.yeu_cau_mo_cong_viec.connect(self.chuyen_den_tab_cong_viec)
         else:
             self.stacked_widget.addWidget(QLabel("Trang chủ chưa sẵn sàng"))
         
@@ -439,10 +440,15 @@ class MainApp(QMainWindow):
         # 13. CÔNG VIỆC
         # =============================================================
 
+        # =============================================================
+        # 13. CÔNG VIỆC
+        # =============================================================
         try:
             self.tab_congviec = QuanLyCongViec(self.user_session, CONN_STR)
             self.stacked_widget.addWidget(self.tab_congviec)
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             self.stacked_widget.addWidget(QLabel(f"❌ Lỗi công việc: {str(e)}"))
 
         # =============================================================
@@ -459,7 +465,6 @@ class MainApp(QMainWindow):
 
 
     def change_page(self, index):
-
         if index <= 0:
             return
 
@@ -469,14 +474,12 @@ class MainApp(QMainWindow):
             3: 2,   # Văn bản đi
             4: 3,   # Văn bản nội bộ
             5: 13,  # Văn bản nội bộ của tôi
-
             6: 4,   # Cán bộ
             7: 5,   # Chức vụ
             8: 6,   # Hạn bảo quản
             9: 7,   # Loại công văn
             10: 8,  # Đơn vị
             11: 9,  # Phân quyền
-
             12: 10, # Quản lý hồ sơ
             13: 11  # Công việc
         }
@@ -486,8 +489,47 @@ class MainApp(QMainWindow):
         if stacked_idx is not None:
             self.stacked_widget.setCurrentIndex(stacked_idx)
 
-        if index == 1 and hasattr(self, "home_controller"):
-            self.home_controller.load_data()
+        # =========================================================
+        # TỰ ĐỘNG NẠP LẠI DỮ LIỆU & DANH MỤC KHI CHUYỂN TRANG
+        # =========================================================
+        try:
+            if index == 1 and hasattr(self, "home_controller"):
+                self.home_controller.load_data()
+                
+            elif index == 2 and hasattr(self, "den_controller"):
+                # Khi bấm vào "Văn bản đến", quét lại Loại công văn Đến và nạp dữ liệu
+                self.den_controller.nap_danh_muc()
+                self.den_controller.load_data()
+                
+            elif index == 3 and hasattr(self, "di_controller"):
+                # Khi bấm vào "Văn bản đi", quét lại Loại công văn Đi và nạp dữ liệu
+                self.di_controller.nap_danh_muc()
+                self.di_controller.load_data()
+                
+            elif index == 9 and hasattr(self, "ctrl_lvb"):
+                # Khi quay lại tab "Loại công văn", làm mới lại bảng
+                self.ctrl_lvb.refresh()
+                
+        except Exception as e:
+            print(f"Lỗi khi auto-refresh trang {index}: {e}")
+
+    def chuyen_den_tab_cv_den(self, ky_hieu):
+        """Chuyển sang tab Văn bản đến và tự động tìm kiếm công văn"""
+        self.sidebar.setCurrentRow(2) # Nhảy sang menu Văn bản đến
+        if hasattr(self, 'tab_den') and hasattr(self.tab_den, 'search_input'):
+            self.tab_den.search_input.setText(ky_hieu)
+            self.tab_den.tim_kiem_signal.emit(ky_hieu) # Tự động lọc đúng công văn đó
+            
+    def chuyen_den_tab_cv_di(self, ky_hieu):
+        """Chuyển sang tab Văn bản đi và tự động tìm kiếm công văn"""
+        self.sidebar.setCurrentRow(3) # Nhảy sang menu Văn bản đi
+        if hasattr(self, 'tab_di') and hasattr(self.tab_di, 'search_input'):
+            self.tab_di.search_input.setText(ky_hieu)
+            self.tab_di.tim_kiem_signal.emit(ky_hieu) # Tự động lọc đúng công văn đó
+
+    def chuyen_den_tab_cong_viec(self, task_id):
+        """Chuyển sang tab Công việc"""
+        self.sidebar.setCurrentRow(13) # Nhảy sang menu Công việc
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
