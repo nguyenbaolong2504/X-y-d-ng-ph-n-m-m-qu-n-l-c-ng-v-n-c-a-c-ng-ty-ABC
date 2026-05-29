@@ -16,8 +16,7 @@ class CongVanDiTableModel(QAbstractTableModel):
             "NoiNhan",          # 5
             "TrichYeu",         # 6
             "TrangThaiChuyen",  # 7
-            "MucDo",            # 8
-            "FilePath"          # 9
+            "FilePath"          # 8
         ]
 
     def rowCount(self, parent=QModelIndex()):

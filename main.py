@@ -5,7 +5,7 @@ def _intercept_connect(*args, **kwargs):
     my_local_conn_str = ( 
         "DRIVER={ODBC Driver 17 for SQL Server};" 
         "SERVER=localhost\\SQLEXPRESS;" 
-        "DATABASE=master;" 
+        "DATABASE=congtyabc;" 
         "Trusted_Connection=yes;" 
         )
 
@@ -25,7 +25,7 @@ sys.path.insert(0, os.getcwd())
 CONN_STR = r""" 
 DRIVER={ODBC Driver 17 for SQL Server}; 
 SERVER=localhost; 
-DATABASE=master; 
+DATABASE=congtyabc; 
 Trusted_Connection=yes; 
 """
 
@@ -168,6 +168,25 @@ class MainApp(QMainWindow):
         self.logout_requested = True
         self.close()
 
+    def load_user_permissions(self):
+        try:
+            conn = pyodbc.connect(CONN_STR)
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT m.MaMenu
+                FROM QuyenMenu q
+                INNER JOIN MenuHeThong m ON q.MenuId = m.Id
+                WHERE q.CanBoId = ?
+                AND q.DuocXem = 1
+            """, (self.user_session.user_id,))
+
+            return [row[0] for row in cursor.fetchall()]
+
+        except Exception as e:
+            print("Lỗi phân quyền:", e)
+            return []
+
     def setup_ui(self):
         central = QWidget()
         self.setCentralWidget(central)
@@ -248,13 +267,12 @@ class MainApp(QMainWindow):
             "📥 Văn bản đến",
             "📤 Văn bản đi",
             "📄 Văn bản nội bộ",
-            "📥 Văn bản nội bộ của tôi",   # Thêm dòng này
+            "📥 Văn bản nội bộ của tôi",   
             "👥 Danh sách cán bộ",
             "📂 Danh mục chức vụ",
             "⏳ Thời hạn bảo quản",
             "🏷️ Loại công văn",
             "🏢 Đơn vị, bộ phận",
-            "⚙️ Xử lý công văn",
             "🔐 Phân quyền sử dụng",
             "🗂️ Mục lục hồ sơ",
             "📁 Danh mục hồ sơ",
@@ -271,6 +289,36 @@ class MainApp(QMainWindow):
         body_layout.addWidget(self.sidebar)
         body_layout.addWidget(self.stacked_widget)
         main_layout.addWidget(body_widget)
+
+        if self.user_session.get_role() != "Admin":
+
+            permissions = self.load_user_permissions()
+
+            menu_map = {
+                1: "HOME",
+                2: "VBDEN",
+                3: "VBDI",
+                4: "NOIBO",
+                5: "NOIBO_TOI",
+                6: "CANBO",
+                7: "CHUCVU",
+                8: "HANBQ",
+                9: "LOAICV",
+                10: "DONVI",
+                11: "PHANQUYEN",
+                12: "MUCLUC",
+                13: "DANHMUC",
+                14: "CONGVIEC"
+            }
+
+            for idx, ma_menu in menu_map.items():
+
+                if ma_menu not in permissions:
+
+                    item = self.sidebar.item(idx)
+
+                    if item:
+                        item.setHidden(True)
 
     def setup_pages(self):
         if TRANGCHU_OK:
@@ -364,17 +412,6 @@ class MainApp(QMainWindow):
         else:
             self.stacked_widget.addWidget(QLabel("Module đơn vị chưa sẵn sàng"))
         
-        if XULY_OK:
-            try:
-                self.tab_xuly = QuanLyXuLyCongVanView()
-                db_conn = pyodbc.connect(CONN_STR)
-                xl_model = XuLyCongVanModel(db_conn)
-                self.xuly_controller = CongVanControllerCustom(self.tab_xuly, xl_model)
-                self.stacked_widget.addWidget(self.tab_xuly)
-            except Exception as e:
-                self.stacked_widget.addWidget(QLabel(f"❌ Lỗi module Xử lý công văn: {str(e)}"))
-        else:
-            self.stacked_widget.addWidget(QLabel("Module Xử lý công văn chưa sẵn sàng"))
 
         # =============================================================
         # 10. PHÂN QUYỀN
@@ -434,7 +471,8 @@ class MainApp(QMainWindow):
         except Exception as e:
             self.stacked_widget.addWidget(QLabel(f"❌ Lỗi văn bản nội bộ của tôi: {str(e)}"))
 
-    def change_page(self, index):
+
+    def change_page(self, index):   
         if index > 0:
             # Map chỉ mục sidebar sang chỉ mục stacked_widget
             # Danh sách các tab theo thứ tự stacked_widget:
@@ -447,12 +485,11 @@ class MainApp(QMainWindow):
             # 6: Thời hạn bảo quản
             # 7: Loại công văn
             # 8: Đơn vị, bộ phận
-            # 9: Xử lý công văn
-            # 10: Phân quyền sử dụng
-            # 11: Mục lục hồ sơ
-            # 12: Danh mục hồ sơ
-            # 13: Công việc
-            # 14: Văn bản nội bộ của tôi
+            # 9: Phân quyền sử dụng
+            # 10: Mục lục hồ sơ
+            # 11: Danh mục hồ sơ
+            # 12: Công việc
+            # 13: Văn bản nội bộ của tôi
             #
             # Sidebar index (bắt đầu từ 1, vì index 0 là " ☰ "):
             # 1: Tổng quan hệ thống -> stacked 0
@@ -465,11 +502,11 @@ class MainApp(QMainWindow):
             # 8: Thời hạn bảo quản -> stacked 6
             # 9: Loại công văn -> stacked 7
             # 10: Đơn vị, bộ phận -> stacked 8
-            # 11: Xử lý công văn -> stacked 9
-            # 12: Phân quyền sử dụng -> stacked 10
-            # 13: Mục lục hồ sơ -> stacked 11
-            # 14: Danh mục hồ sơ -> stacked 12
-            # 15: Công việc -> stacked 13
+            # 11: Phân quyền sử dụng -> stacked 9
+            # 12: Mục lục hồ sơ -> stacked 10
+            # 13: Danh mục hồ sơ -> stacked 11
+            # 14: Công việc -> stacked 12
+            # 15: Văn bản nội bộ của tôi -> stacked 13
             mapping = {
                 1: 0,   # Tổng quan
                 2: 1,   # Văn bản đến
@@ -481,11 +518,11 @@ class MainApp(QMainWindow):
                 8: 6,   # Thời hạn bảo quản
                 9: 7,   # Loại công văn
                 10: 8,  # Đơn vị, bộ phận
-                11: 9,  # Xử lý công văn
-                12: 10, # Phân quyền sử dụng
-                13: 11, # Mục lục hồ sơ
-                14: 12, # Danh mục hồ sơ
-                15: 13, # Công việc
+                11: 9,  # Phân quyền sử dụng
+                12: 10, # Mục lục hồ sơ
+                13: 11, # Danh mục hồ sơ
+                14: 12, # Công việc
+                15: 13, # Văn bản nội bộ của tôi
             }
             stacked_idx = mapping.get(index)
             if stacked_idx is not None:

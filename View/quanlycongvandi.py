@@ -198,7 +198,6 @@ class MainWindowDi(QMainWindow):
 
         muc_do_cb = QComboBox()
         muc_do_cb.addItems(["Thường", "Khẩn", "Hỏa tốc"])
-        if row_data and row_data.get('MucDo'): muc_do_cb.setCurrentText(row_data.get('MucDo'))
 
         trang_thai_cb = QComboBox()
         trang_thai_cb.addItems(["Dự thảo", "Chờ duyệt", "Đã ký", "Đã phát hành"])
@@ -297,7 +296,6 @@ class MainWindowDi(QMainWindow):
                 "DonViSoanId": don_vi_id,
                 "NguoiKyId": nguoi_ky_id,
                 "VanBanDenGocId": vb_den_goc_id,
-                "MucDo": muc_do_cb.currentText(),
                 "TrangThaiChuyen": 1,   # 1: đã phát hành (tạm)
                 "TrichYeu": in_trichyeu.toPlainText().strip(),
                 "NoiNhan": in_noinhan.toPlainText().strip(),
@@ -336,7 +334,7 @@ class MainWindowDi(QMainWindow):
         html += "<h2 style='text-align: center;'>DANH MỤC CÔNG VĂN PHÁT HÀNH</h2><table><tr><th>STT</th><th>Số đi</th><th>Ký hiệu</th><th>Ngày ký</th><th>Nơi nhận</th><th>Trích yếu</th><th>Mức độ</th></tr>"
         for i in range(model.rowCount()):
             d = model.get_row(i)
-            html += f"<tr><td>{i+1}</td><td>{d.get('SoPhatHanh','')}</td><td>{d.get('KyHieu','')}</td><td>{d.get('NgayKy','')}</td><td>{d.get('NoiNhan','')}</td><td>{d.get('TrichYeu','')}</td><td>{d.get('MucDo','Thường')}</td></tr>"
+            html += f"<tr><td>{i+1}</td><td>{d.get('SoPhatHanh','')}</td><td>{d.get('KyHieu','')}</td><td>{d.get('NgayKy','')}</td><td>{d.get('NoiNhan','')}</td><td>{d.get('TrichYeu','')}</td><td>{d.get('','Thường')}</td></tr>"
         html += "</table></body></html>"
         self.doc = QTextDocument()
         self.doc.setHtml(html)

@@ -63,32 +63,74 @@ class CongVanModel:
             return 0
 
     def get_all(self, is_admin=False, role=None, ten_don_vi=None) -> List[Dict]:
+
         sql = """
-            SELECT cv.Id as id, cv.NgayDen as ngay_den, cv.SoDen as so_den,
-                   cv.NoiPhatHanh as tac_gia, cv.KyHieu as so_ky_hieu,
-                   cv.NgayKy as ngay_van_ban, cv.TrichYeu as trich_yeu,
-                   ISNULL(cb.HoTen, cv.NoiNhan) as nguoi_xu_ly, cv.TrangThaiChuyen as trang_thai, 
-                   cv.GhiChu as ghi_chu, cv.FileDinhKem as file_dinh_kem,
-                   cv.PhanLoaiId as phan_loai_id, cv.MucDo as muc_do,
-                   pl.TenLoai as ten_loai
+            SELECT 
+                cv.Id as id,
+                cv.NgayDen as ngay_den,
+                cv.SoDen as so_den,
+                cv.NoiPhatHanh as tac_gia,
+                cv.KyHieu as so_ky_hieu,
+                cv.NgayKy as ngay_van_ban,
+                cv.TrichYeu as trich_yeu,
+                ISNULL(cb.HoTen, cv.NoiNhan) as nguoi_xu_ly,
+                cv.TrangThaiChuyen as trang_thai,
+                cv.GhiChu as ghi_chu,
+                cv.FileDinhKem as file_dinh_kem,
+                cv.PhanLoaiId as phan_loai_id,
+                pl.TenLoai as ten_loai
+
             FROM CongVanDen cv
-            LEFT JOIN LoaiCongVan pl ON cv.PhanLoaiId = pl.Id
-            LEFT JOIN CanBo cb ON (TRY_CAST(cv.NoiNhan AS INT) = cb.Id)
+
+            LEFT JOIN LoaiCongVan pl 
+                ON cv.PhanLoaiId = pl.Id
+
+            LEFT JOIN CanBo cb 
+                ON TRY_CAST(cv.NoiNhan AS INT) = cb.Id
         """
+
         conditions = []
+
         params = []
+
         if not is_admin:
+
             if role == 'NhanVien' and ten_don_vi == 'IT':
-                conditions.append("cv.NoiPhatHanh LIKE N'%Giám đốc%'")
-                conditions.append("cv.NoiNhan = ?")
-                params.append(ten_don_vi)
+
+                conditions.append(
+                    "cv.NoiPhatHanh LIKE N'%Giám đốc%'"
+                )
+
+                conditions.append(
+                    "cv.NoiNhan = ?"
+                )
+
+                params.append(
+                    ten_don_vi
+                )
+
             elif role in ('TruongPhong', 'NhanVien'):
-                conditions.append("cv.NoiNhan = ?")
-                params.append(ten_don_vi)
+
+                conditions.append(
+                    "cv.NoiNhan = ?"
+                )
+
+                params.append(
+                    ten_don_vi
+                )
+
         if conditions:
-            sql += " WHERE " + " AND ".join(conditions)
+
+            sql += " WHERE " + " AND ".join(
+                conditions
+            )
+
         sql += " ORDER BY cv.NgayDen DESC"
-        return self._execute_query(sql, tuple(params))
+
+        return self._execute_query(
+            sql,
+            tuple(params)
+        )
 
     def search_by_author_or_number(self, keyword: str, is_admin=False, role=None, ten_don_vi=None) -> List[Dict]:
         sql = """
@@ -97,7 +139,7 @@ class CongVanModel:
                    cv.NgayKy as ngay_van_ban, cv.TrichYeu as trich_yeu,
                    ISNULL(cb.HoTen, cv.NoiNhan) as nguoi_xu_ly, cv.TrangThaiChuyen as trang_thai, 
                    cv.GhiChu as ghi_chu, cv.FileDinhKem as file_dinh_kem,
-                   cv.PhanLoaiId as phan_loai_id, cv.MucDo as muc_do,
+                   cv.PhanLoaiId as phan_loai_id,  as muc_do,
                    pl.TenLoai as ten_loai
             FROM CongVanDen cv
             LEFT JOIN LoaiCongVan pl ON cv.PhanLoaiId = pl.Id
@@ -127,7 +169,7 @@ class CongVanModel:
                    cv.NgayKy as ngay_van_ban, cv.TrichYeu as trich_yeu,
                    ISNULL(cb.HoTen, cv.NoiNhan) as nguoi_xu_ly, cv.TrangThaiChuyen as trang_thai, 
                    cv.GhiChu as ghi_chu, cv.FileDinhKem as file_dinh_kem,
-                   cv.PhanLoaiId as phan_loai_id, cv.MucDo as muc_do,
+                   cv.PhanLoaiId as phan_loai_id,  as muc_do,
                    pl.TenLoai as ten_loai
             FROM CongVanDen cv
             LEFT JOIN LoaiCongVan pl ON cv.PhanLoaiId = pl.Id
@@ -157,75 +199,156 @@ class CongVanModel:
         return self._execute_query(base_sql, tuple(params))
 
     def add(self, data: Dict) -> int:
+
         try:
+
             with self._get_connection() as conn:
+
                 cursor = conn.cursor()
+
                 max_so_den = self.get_max_so_den()
+
                 new_so_den = max_so_den + 1
+
                 ngay_den_val = data.get('ngay_den')
+
                 nam = str(ngay_den_val)[:4] if ngay_den_val else ""
+
                 cursor.execute("""
-                    INSERT INTO CongVanDen 
-                    (Nam, SoDen, KyHieu, NgayDen, NgayKy, NoiPhatHanh,
-                     TrichYeu, NoiNhan, GhiChu, FileDinhKem,
-                     TrangThaiChuyen, PhanLoaiId, TrangThaiXuLy, MucDo)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+
+                    INSERT INTO CongVanDen
+                    (
+                        Nam,
+                        SoDen,
+                        KyHieu,
+                        NgayDen,
+                        NgayKy,
+                        NoiPhatHanh,
+                        TrichYeu,
+                        NoiNhan,
+                        GhiChu,
+                        FileDinhKem,
+                        TrangThaiChuyen,
+                        PhanLoaiId,
+                        TrangThaiXuLy,
+                        MucDo
+                    )
+
+                    VALUES
+                    (
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    )
+
                 """, (
-                    nam, new_so_den, data.get('so_ky_hieu'),
-                    data.get('ngay_den'), data.get('ngay_van_ban'), data.get('tac_gia'),
-                    data.get('trich_yeu'), data.get('nguoi_xu_ly'), data.get('ghi_chu'),
-                    data.get('file_dinh_kem'), data.get('trang_thai', 0),
-                    data.get('phan_loai_id'), data.get('muc_do')
+
+                    nam,
+
+                    new_so_den,
+
+                    data.get('so_ky_hieu'),
+
+                    data.get('ngay_den'),
+
+                    data.get('ngay_van_ban'),
+
+                    data.get('tac_gia'),
+
+                    data.get('trich_yeu'),
+
+                    data.get('nguoi_xu_ly'),
+
+                    data.get('ghi_chu'),
+
+                    data.get('file_dinh_kem'),
+
+                    data.get('trang_thai', 0),
+
+                    data.get('phan_loai_id'),
+
+                    0,
+
+                    data.get('muc_do', 'Thường')
+
                 ))
+
                 conn.commit()
-                cursor.execute("SELECT @@IDENTITY")
-                return int(cursor.fetchone()[0])
+
+                cursor.execute(
+                    "SELECT @@IDENTITY"
+                )
+
+                return int(
+                    cursor.fetchone()[0]
+                )
+
         except Exception as e:
-            raise Exception(f"Lỗi thêm mới dữ liệu: {str(e)}")
+
+            raise Exception(
+                f"Lỗi thêm mới dữ liệu: {str(e)}"
+            )
 
     def update(self, id: int, data: Dict):
-        try:
-            with self._get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    UPDATE CongVanDen SET
-                        KyHieu = ?, NgayDen = ?, NgayKy = ?, NoiPhatHanh = ?,
-                        TrichYeu = ?, NoiNhan = ?, GhiChu = ?, FileDinhKem = ?,
-                        TrangThaiChuyen = ?, PhanLoaiId = ?, MucDo = ?
-                    WHERE Id = ?
-                """, (
-                    data.get('so_ky_hieu'), data.get('ngay_den'), data.get('ngay_van_ban'),
-                    data.get('tac_gia'), data.get('trich_yeu'), data.get('nguoi_xu_ly'),
-                    data.get('ghi_chu'), data.get('file_dinh_kem'),
-                    data.get('trang_thai', 0), data.get('phan_loai_id'), data.get('muc_do'), id
-                ))
-                conn.commit()
-        except Exception as e:
-            raise Exception(f"Lỗi cập nhật dữ liệu: {str(e)}")
 
-    def chuyen_xu_ly_van_ban(self, id_cv: int, data: Dict):
         try:
+
             with self._get_connection() as conn:
+
                 cursor = conn.cursor()
-                chu_tri_ten = data.get('chu_tri_ten', '')
-                tham_gia_ten = ", ".join(data.get('tham_gia_ten', []))
-                noi_dung = data.get('noi_dung', '')
-                yeu_cau = data.get('yeu_cau_xu_ly', '')
-                ngay_xl = data.get('ngay_xu_ly', '')
-                ghi_chu_phan_cong = (
-                    f"Nội dung: {noi_dung}\n"
-                    f"Yêu cầu: {yeu_cau}\n"
-                    f"Người tham gia: {tham_gia_ten}\n"
-                    f"Hạn xử lý: {ngay_xl}"
-                )
+
                 cursor.execute("""
-                    UPDATE CongVanDen 
-                    SET NoiNhan = ?, GhiChu = ?, TrangThaiChuyen = 2 
+
+                    UPDATE CongVanDen
+
+                    SET
+                        KyHieu = ?,
+                        NgayDen = ?,
+                        NgayKy = ?,
+                        NoiPhatHanh = ?,
+                        TrichYeu = ?,
+                        NoiNhan = ?,
+                        GhiChu = ?,
+                        FileDinhKem = ?,
+                        TrangThaiChuyen = ?,
+                        PhanLoaiId = ?,
+                        MucDo = ?
+
                     WHERE Id = ?
-                """, (chu_tri_ten, ghi_chu_phan_cong, id_cv))
+
+                """, (
+
+                    data.get('so_ky_hieu'),
+
+                    data.get('ngay_den'),
+
+                    data.get('ngay_van_ban'),
+
+                    data.get('tac_gia'),
+
+                    data.get('trich_yeu'),
+
+                    data.get('nguoi_xu_ly'),
+
+                    data.get('ghi_chu'),
+
+                    data.get('file_dinh_kem'),
+
+                    data.get('trang_thai', 0),
+
+                    data.get('phan_loai_id'),
+
+                    data.get('muc_do', 'Thường'),
+
+                    id
+
+                ))
+
                 conn.commit()
+
         except Exception as e:
-            raise Exception(f"Lỗi phân công xử lý: {str(e)}")
+
+            raise Exception(
+                f"Lỗi cập nhật dữ liệu: {str(e)}"
+            )
 
     def delete(self, id: int):
         try:

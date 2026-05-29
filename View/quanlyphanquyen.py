@@ -14,15 +14,27 @@ class QuanLyPhanQuyen(QWidget):
         # =====================================================
 
         self.conn = pyodbc.connect(
-
             "DRIVER={ODBC Driver 17 for SQL Server};"
-
-            "SERVER=localhost\\SQLEXPRESS;"
-
-            "DATABASE=congtyadc;"
-
+            "SERVER=DESKTOP-MRSI227\\SQLEXPRESS;"
+            "DATABASE=congtyabc;"
             "Trusted_Connection=yes;"
         )
+
+        cursor = self.conn.cursor()
+
+        cursor.execute("SELECT @@SERVERNAME")
+        print("SERVER =", cursor.fetchone()[0])
+
+        cursor.execute("SELECT DB_NAME()")
+        print("DATABASE =", cursor.fetchone()[0])
+
+        cursor.execute("""
+        SELECT TABLE_NAME
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_NAME='QuyenMenu'
+        """)
+
+        print("QUYENMENU =", cursor.fetchall())
 
         # =====================================================
         # LAYOUT
@@ -160,6 +172,79 @@ class QuanLyPhanQuyen(QWidget):
 
         layout.addWidget(self.table)
 
+        
+        # =====================================================
+        # PHÂN QUYỀN MENU
+        # =====================================================
+
+        permission_frame = QFrame()
+
+        permission_layout = QVBoxLayout(permission_frame)
+
+        title_permission = QLabel("📋 Menu được phép sử dụng")
+
+        title_permission.setStyleSheet("""
+        font-size:18px;
+        font-weight:bold;
+        padding:10px;
+        """)
+
+        permission_layout.addWidget(title_permission)
+
+        self.menu_list = QListWidget()
+
+        self.all_menus = [
+
+            "Tổng quan hệ thống",
+            "Văn bản đến",
+            "Văn bản đi",
+            "Văn bản nội bộ",
+            "Văn bản nội bộ của tôi",
+            "Danh sách cán bộ",
+            "Danh mục chức vụ",
+            "Thời hạn bảo quản",
+            "Loại công văn",
+            "Đơn vị, bộ phận",
+            "Phân quyền sử dụng",
+            "Mục lục hồ sơ",
+            "Danh mục hồ sơ",
+            "Công việc"
+
+        ]
+
+        for menu in self.all_menus:
+
+            item = QListWidgetItem(menu)
+
+            item.setFlags(
+                item.flags() |
+                Qt.ItemFlag.ItemIsUserCheckable
+            )
+
+            item.setCheckState(
+                Qt.CheckState.Unchecked
+            )
+
+            self.menu_list.addItem(item)
+
+        permission_layout.addWidget(self.menu_list)
+
+        self.btn_save_permission = QPushButton(
+            "💾 Lưu phân quyền"
+        )
+        self.table.itemSelectionChanged.connect( 
+            self.load_permission 
+        ) 
+        self.btn_save_permission.clicked.connect( 
+            self.save_permission 
+        )
+
+        permission_layout.addWidget(
+            self.btn_save_permission
+        )
+
+        layout.addWidget(permission_frame)
+
         # =====================================================
         # INFO PANEL
         # =====================================================
@@ -250,3 +335,171 @@ class QuanLyPhanQuyen(QWidget):
                 item = QTableWidgetItem(str(value))
 
                 self.table.setItem(row_idx, col_idx, item)
+
+    def load_permission(self):
+
+        try:
+
+            row = self.table.currentRow()
+
+            if row < 0:
+                return
+
+            item = self.table.item(row, 0)
+
+            if item is None:
+                return
+
+            username = item.text()
+
+            cursor = self.conn.cursor()
+
+            # Lấy CanBoId
+            cursor.execute("""
+                SELECT Id
+                FROM CanBo
+                WHERE Username = ?
+            """, (username,))
+
+            canbo = cursor.fetchone()
+
+            if not canbo:
+                return
+
+            canbo_id = canbo[0]
+
+            # Bỏ tick toàn bộ trước
+            for i in range(self.menu_list.count()):
+                self.menu_list.item(i).setCheckState(
+                    Qt.CheckState.Unchecked
+                )
+
+            # Lấy quyền đã cấp
+            cursor.execute("""
+                SELECT m.TenMenu
+                FROM dbo.QuyenMenu q
+                INNER JOIN dbo.MenuHeThong m
+                    ON q.MenuId = m.Id
+                WHERE q.CanBoId = ?
+                AND q.DuocXem = 1
+            """, (canbo_id,))
+
+            menus = [row[0] for row in cursor.fetchall()]
+
+            for i in range(self.menu_list.count()):
+
+                item = self.menu_list.item(i)
+
+                if item.text() in menus:
+
+                    item.setCheckState(
+                        Qt.CheckState.Checked
+                    )
+
+        except Exception as e:
+
+            QMessageBox.critical(
+                self,
+                "Lỗi",
+                str(e)
+            )
+
+
+    def save_permission(self):
+
+        try:
+
+            row = self.table.currentRow()
+
+            if row < 0:
+
+                QMessageBox.warning(
+                    self,
+                    "Thông báo",
+                    "Vui lòng chọn người dùng"
+                )
+
+                return
+
+            username = self.table.item(row, 0).text()
+
+            cursor = self.conn.cursor()
+
+            # Lấy CanBoId
+            cursor.execute("""
+                SELECT Id
+                FROM CanBo
+                WHERE Username = ?
+            """, (username,))
+
+            canbo = cursor.fetchone()
+
+            if not canbo:
+
+                QMessageBox.warning(
+                    self,
+                    "Lỗi",
+                    "Không tìm thấy cán bộ"
+                )
+
+                return
+
+            canbo_id = canbo[0]
+
+            # Xóa quyền cũ
+            cursor.execute("""
+                DELETE FROM dbo.QuyenMenu
+                WHERE CanBoId = ?
+            """, (canbo_id,))
+
+            # Thêm quyền mới
+            for i in range(self.menu_list.count()):
+
+                item = self.menu_list.item(i)
+
+                if item.checkState() == Qt.CheckState.Checked:
+
+                    cursor.execute("""
+                        SELECT Id
+                        FROM dbo.MenuHeThong
+                        WHERE TenMenu = ?
+                    """, (item.text(),))
+
+                    menu = cursor.fetchone()
+
+                    if menu:
+
+                        menu_id = menu[0]
+
+                        cursor.execute("""
+                            INSERT INTO dbo.QuyenMenu
+                            (
+                                CanBoId,
+                                MenuId,
+                                DuocXem
+                            )
+                            VALUES
+                            (
+                                ?, ?, 1
+                            )
+                        """,
+                        (
+                            canbo_id,
+                            menu_id
+                        ))
+
+            self.conn.commit()
+
+            QMessageBox.information(
+                self,
+                "Thành công",
+                f"Đã lưu phân quyền cho {username}"
+            )
+
+        except Exception as e:
+
+            QMessageBox.critical(
+                self,
+                "Lỗi",
+                str(e)
+            )

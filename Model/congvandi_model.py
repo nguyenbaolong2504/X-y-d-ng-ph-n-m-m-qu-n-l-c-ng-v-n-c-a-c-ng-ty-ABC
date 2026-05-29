@@ -49,7 +49,7 @@ class CongVanDiModel:
         sql = """
             SELECT Id, SoPhatHanh, Nam, KyHieu, NgayKy, 
                    NoiNhan, TrichYeu, TrangThaiChuyen, GhiChu, FilePath, 
-                   MucDo, PhanLoaiId, DonViSoanId, NguoiKyId, VanBanDenGocId
+                    PhanLoaiId, DonViSoanId, NguoiKyId, VanBanDenGocId
             FROM CongVanPhatHanh
             WHERE 1=1
         """
@@ -135,12 +135,12 @@ class CongVanDiModel:
                 cursor.execute("""
                     INSERT INTO CongVanPhatHanh 
                     (SoPhatHanh, Nam, KyHieu, NgayKy, TrichYeu, NoiNhan, TrangThaiChuyen, 
-                     GhiChu, FilePath, NgayChuyen, MucDo, PhanLoaiId, DonViSoanId, NguoiKyId, VanBanDenGocId, NguoiTaoId)
+                     GhiChu, FilePath, NgayChuyen, PhanLoaiId, DonViSoanId, NguoiKyId, VanBanDenGocId, NguoiTaoId)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE(), ?, ?, ?, ?, ?, ?)
                 """, (
                     new_so, data.get('Nam'), data.get('KyHieu'), data.get('NgayKy'), 
                     data.get('TrichYeu'), data.get('NoiNhan'), data.get('TrangThaiChuyen', 0), 
-                    data.get('GhiChu'), data.get('FilePath'), data.get('MucDo'),
+                    data.get('GhiChu'), data.get('FilePath'), 
                     phan_loai_id, don_vi_soan_id, nguoi_ky_id,
                     van_ban_den_goc_id, data.get('NguoiTaoId', 1)
                 ))
@@ -185,13 +185,13 @@ class CongVanDiModel:
                 cursor.execute("""
                     UPDATE CongVanPhatHanh SET
                         Nam=?, KyHieu=?, NgayKy=?, TrichYeu=?, NoiNhan=?, 
-                        TrangThaiChuyen=?, GhiChu=?, FilePath=?, MucDo=?,
+                        TrangThaiChuyen=?, GhiChu=?, FilePath=?, 
                         PhanLoaiId=?, DonViSoanId=?, NguoiKyId=?, VanBanDenGocId=?
                     WHERE Id=?
                 """, (
                     data.get('Nam'), data.get('KyHieu'), data.get('NgayKy'), 
                     data.get('TrichYeu'), data.get('NoiNhan'), data.get('TrangThaiChuyen', 0), 
-                    data.get('GhiChu'), data.get('FilePath'), data.get('MucDo'),
+                    data.get('GhiChu'), data.get('FilePath'), 
                     phan_loai_id, don_vi_soan_id, nguoi_ky_id,
                     van_ban_den_goc_id, id_cv
                 ))

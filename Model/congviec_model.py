@@ -112,7 +112,7 @@ class CongViecModel:
         cv_den_id = row[0]
         thoi_gian = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute("""
-            INSERT INTO LichSuXuLy (CongVanDenId, NguoiThuChienId, ThaiGian, HanhDong, ChiTiet)
+            INSERT INTO LichSuXuLy (CongVanDenId, NguoiThucHienId, ThoiGian, HanhDong, ChiTiet)
             VALUES (?, ?, ?, ?, ?)
         """, (cv_den_id, nguoi_id, thoi_gian, hanh_dong, chi_tiet))
         conn.commit()
@@ -122,11 +122,11 @@ class CongViecModel:
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT ls.HanhDong, ls.ChiTiet, ls.ThaiGian, cb.HoTen
+            SELECT ls.HanhDong, ls.ChiTiet, ls.ThoiGian, cb.HoTen
             FROM LichSuXuLy ls
-            JOIN CanBo cb ON ls.NguoiThuChienId = cb.Id
+            JOIN CanBo cb ON ls.NguoiThucHienId = cb.Id
             WHERE ls.CongVanDenId = (SELECT CongVanDenId FROM PhanCongXuLy WHERE Id = ?)
-            ORDER BY ls.ThaiGian
+            ORDER BY ls.ThoiGian
         """, cv_id)
         rows = cursor.fetchall()
         conn.close()
@@ -151,14 +151,14 @@ class CongViecModel:
         conn = self._get_connection()
         cursor = conn.cursor()
         sql = """
-            SELECT pc.Id, pc.NoiDung, ls.HanhDong, ls.ChiTiet, ls.ThaiGian, cb.HoTen as NguoiPhanHoi
+            SELECT pc.Id, pc.NoiDung, ls.HanhDong, ls.ChiTiet, ls.ThoiGian, cb.HoTen as NguoiPhanHoi
             FROM PhanCongXuLy pc
             JOIN LichSuXuLy ls ON ls.CongVanDenId = pc.CongVanDenId
-            JOIN CanBo cb ON ls.NguoiThuChienId = cb.Id
+            JOIN CanBo cb ON ls.NguoiThucHienId = cb.Id
             WHERE (pc.NguoiDuocGiaoId = ? OR pc.NguoiGiaoId = ?)
               AND ls.HanhDong = 'Phản hồi'
-              AND ls.ThaiGian > DATEADD(day, -7, GETDATE())
-            ORDER BY ls.ThaiGian DESC
+              AND ls.ThoiGian > DATEADD(day, -7, GETDATE())
+            ORDER BY ls.ThoiGian DESC
         """
         cursor.execute(sql, (nguoi_dung_id, nguoi_dung_id))
         rows = cursor.fetchall()
