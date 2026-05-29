@@ -51,8 +51,7 @@ from View.quanlycongvandi import MainWindowDi
 from Controller.congvandi_controller import CongVanDiController
 from View.login import LoginWindow
 from View.quanlyphanquyen import QuanLyPhanQuyen
-from View.muclichoso import MucLucHoSo
-from View.danhmuchoso import DanhMucHoSo
+from View.danhmuchoso import QuanLyHoSo  # ✅ Đã import đúng
 from View.quanlycongviec import QuanLyCongViec
 ModelNoiBo, NOIBO_OK = safe_import("Model.model_noibo", "ModelNoiBo")
 MainWindowNoiBo, _ = safe_import("View.view_noibo", "MainWindowNoiBo")
@@ -274,8 +273,7 @@ class MainApp(QMainWindow):
             "🏷️ Loại công văn",
             "🏢 Đơn vị, bộ phận",
             "🔐 Phân quyền sử dụng",
-            "🗂️ Mục lục hồ sơ",
-            "📁 Danh mục hồ sơ",
+            "🗂️ Quản lý hồ sơ",  # ✅ Sửa từ "Quản lý hồ sơ" thành "🗂️ Quản lý hồ sơ"
             "✅ Công việc"
         ]
         for text in menu_items:
@@ -306,9 +304,8 @@ class MainApp(QMainWindow):
                 9: "LOAICV",
                 10: "DONVI",
                 11: "PHANQUYEN",
-                12: "MUCLUC",
-                13: "DANHMUC",
-                14: "CONGVIEC"
+                12: "HOSO",
+                13: "CONGVIEC"
             }
 
             for idx, ma_menu in menu_map.items():
@@ -425,28 +422,17 @@ class MainApp(QMainWindow):
                 QLabel(f"❌ Lỗi phân quyền: {str(e)}")
             )
 
+
         # =============================================================
-        # 11. MỤC LỤC HỒ SƠ
+        # 12. QUẢN LÝ HỒ SƠ (ĐÃ SỬA TÊN)
         # =============================================================
 
         try:
-            self.tab_muclichoso = MucLucHoSo()
-            self.stacked_widget.addWidget(self.tab_muclichoso)
+            self.quanlyhoso_page = QuanLyHoSo()  # ✅ Sử dụng class QuanLyHoSo
+            self.stacked_widget.addWidget(self.quanlyhoso_page)
         except Exception as e:
             self.stacked_widget.addWidget(
-                QLabel(f"❌ Lỗi mục lục hồ sơ: {str(e)}")
-            )
-
-        # =============================================================
-        # 12. DANH MỤC HỒ SƠ
-        # =============================================================
-
-        try:
-            self.tab_danhmuchoso = DanhMucHoSo()
-            self.stacked_widget.addWidget(self.tab_danhmuchoso)
-        except Exception as e:
-            self.stacked_widget.addWidget(
-                QLabel(f"❌ Lỗi danh mục hồ sơ: {str(e)}")
+                QLabel(f"❌ Lỗi quản lý hồ sơ: {str(e)}")
             )
 
         # =============================================================
@@ -472,63 +458,36 @@ class MainApp(QMainWindow):
             self.stacked_widget.addWidget(QLabel(f"❌ Lỗi văn bản nội bộ của tôi: {str(e)}"))
 
 
-    def change_page(self, index):   
-        if index > 0:
-            # Map chỉ mục sidebar sang chỉ mục stacked_widget
-            # Danh sách các tab theo thứ tự stacked_widget:
-            # 0: Trang chủ
-            # 1: Văn bản đến
-            # 2: Văn bản đi
-            # 3: Văn bản nội bộ (quản lý)
-            # 4: Danh sách cán bộ
-            # 5: Danh mục chức vụ
-            # 6: Thời hạn bảo quản
-            # 7: Loại công văn
-            # 8: Đơn vị, bộ phận
-            # 9: Phân quyền sử dụng
-            # 10: Mục lục hồ sơ
-            # 11: Danh mục hồ sơ
-            # 12: Công việc
-            # 13: Văn bản nội bộ của tôi
-            #
-            # Sidebar index (bắt đầu từ 1, vì index 0 là " ☰ "):
-            # 1: Tổng quan hệ thống -> stacked 0
-            # 2: Văn bản đến -> stacked 1
-            # 3: Văn bản đi -> stacked 2
-            # 4: Văn bản nội bộ -> stacked 3
-            # 5: Văn bản nội bộ của tôi -> stacked 14
-            # 6: Danh sách cán bộ -> stacked 4
-            # 7: Danh mục chức vụ -> stacked 5
-            # 8: Thời hạn bảo quản -> stacked 6
-            # 9: Loại công văn -> stacked 7
-            # 10: Đơn vị, bộ phận -> stacked 8
-            # 11: Phân quyền sử dụng -> stacked 9
-            # 12: Mục lục hồ sơ -> stacked 10
-            # 13: Danh mục hồ sơ -> stacked 11
-            # 14: Công việc -> stacked 12
-            # 15: Văn bản nội bộ của tôi -> stacked 13
-            mapping = {
-                1: 0,   # Tổng quan
-                2: 1,   # Văn bản đến
-                3: 2,   # Văn bản đi
-                4: 3,   # Văn bản nội bộ (quản lý)
-                5: 14,  # Văn bản nội bộ của tôi
-                6: 4,   # Danh sách cán bộ
-                7: 5,   # Danh mục chức vụ
-                8: 6,   # Thời hạn bảo quản
-                9: 7,   # Loại công văn
-                10: 8,  # Đơn vị, bộ phận
-                11: 9,  # Phân quyền sử dụng
-                12: 10, # Mục lục hồ sơ
-                13: 11, # Danh mục hồ sơ
-                14: 12, # Công việc
-                15: 13, # Văn bản nội bộ của tôi
-            }
-            stacked_idx = mapping.get(index)
-            if stacked_idx is not None:
-                self.stacked_widget.setCurrentIndex(stacked_idx)
-            if index == 1 and hasattr(self, 'home_controller'):
-                self.home_controller.load_data()
+    def change_page(self, index):
+
+        if index <= 0:
+            return
+
+        mapping = {
+            1: 0,   # Tổng quan
+            2: 1,   # Văn bản đến
+            3: 2,   # Văn bản đi
+            4: 3,   # Văn bản nội bộ
+            5: 13,  # Văn bản nội bộ của tôi
+
+            6: 4,   # Cán bộ
+            7: 5,   # Chức vụ
+            8: 6,   # Hạn bảo quản
+            9: 7,   # Loại công văn
+            10: 8,  # Đơn vị
+            11: 9,  # Phân quyền
+
+            12: 10, # Quản lý hồ sơ
+            13: 11  # Công việc
+        }
+
+        stacked_idx = mapping.get(index)
+
+        if stacked_idx is not None:
+            self.stacked_widget.setCurrentIndex(stacked_idx)
+
+        if index == 1 and hasattr(self, "home_controller"):
+            self.home_controller.load_data()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
