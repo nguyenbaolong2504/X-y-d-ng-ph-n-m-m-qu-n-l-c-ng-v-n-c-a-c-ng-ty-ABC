@@ -1,72 +1,153 @@
 from Model.congvan_model import CongVanModel
 from Model.congvandi_model import CongVanDiModel
+from Model.model_noibo import ModelNoiBo
+from Model.congviec_model import CongViecModel
+from datetime import datetime, timedelta
+import calendar
+
+FALLBACK_CONN_STR = r"DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=congtyadc;Trusted_Connection=yes;"
 
 class TrangChuController:
     def __init__(self, view, user_session):
         self.view = view
         self.user_session = user_session
+        
         self.model_den = CongVanModel()
         self.model_di = CongVanDiModel()
+        conn_str = getattr(self.model_den, 'conn_str', FALLBACK_CONN_STR)
+        self.model_noibo = ModelNoiBo()
+        self.model_congviec = CongViecModel(conn_str)
 
-        # Kết nối nút "Cập nhật thống kê"
-        self.view.yeu_cau_thong_ke.connect(self.load_data)
+        if hasattr(self.view, 'date_from') and hasattr(self.view, 'date_to'):
+            self.view.date_from.dateChanged.connect(self.load_chart_data)
+            self.view.date_to.dateChanged.connect(self.load_chart_data)
+        
+        self.view.yeu_cau_mo_cong_viec.connect(self.mark_task_as_read)
         self.load_data()
 
     def load_data(self):
-        # Lấy dữ liệu có lọc theo quyền của người dùng
-        ds_den = self.model_den.get_all(
-            is_admin=self.user_session.is_admin_user(),
-            role=self.user_session.get_role(),
-            ten_don_vi=self.user_session.get_ten_don_vi()
-        )
-        ds_di = self.model_di.get_all(
-            is_admin=self.user_session.is_admin_user(),
-            role=self.user_session.get_role(),
-            ten_don_vi=self.user_session.get_ten_don_vi()
-        )
+        from PyQt6.QtWidgets import QApplication
+        QApplication.processEvents()
+        
+        self.load_data_den()
+        self.load_data_di()
+        self.load_data_noibo() # <-- GỌI NẠP DỮ LIỆU NỘI BỘ
+        self.load_data_congviec()
+        self.load_tables_and_panel()
+        self.load_chart_data()
 
-        # Số lượng thực tế
-        so_luong_den = len(ds_den)
-        so_luong_di = len(ds_di)
-        so_luong_hoso = 0   # Bạn có thể thay bằng model hồ sơ sau
-        ds_nhiem_vu = []    # Bạn có thể thay bằng model nhiệm vụ sau
+    def mark_task_as_read(self, task_id):
+        try:
+            conn = self.model_congviec._get_connection()
+            cursor = conn.cursor()
+            cursor.execute("UPDATE PhanCongXuLy SET TrangThai = 2 WHERE Id = ? AND TrangThai = 1", (task_id,))
+            conn.commit()
+            conn.close()
+            self.load_tables_and_panel()
+        except: pass
 
-        # Dữ liệu nhiệm vụ mẫu (tạm thời)
-        if not ds_nhiem_vu:
-            ds_nhiem_vu = [
-                {'tieu_de': 'Xử lý công văn đến 577/UBND-VX (về dịch bệnh)',
-                 'han_hoan_thanh': '2026-04-20',
-                 'trang_thai': 'Đang xử lý',
-                 'lien_quan': 'Công văn đến #1'},
-                {'tieu_de': 'Soạn thảo công văn đi trình Sở Y Tế ký',
-                 'han_hoan_thanh': '2026-04-22',
-                 'trang_thai': 'Chưa xử lý',
-                 'lien_quan': 'Công văn đi #3'},
-                {'tieu_de': 'Phê duyệt hồ sơ lưu trữ ABC',
-                 'han_hoan_thanh': '2026-04-18',
-                 'trang_thai': 'Đã hoàn thành',
-                 'lien_quan': 'Hồ sơ ABC #1'},
-            ]
-        so_luong_nhiem_vu = len(ds_nhiem_vu)
+    def _check_date(self, date_val, d=None, m=None, y=None):
+        if not date_val: return False
+        try:
+            if hasattr(date_val, 'year'):
+                val_y, val_m, val_d = date_val.year, date_val.month, date_val.day
+            else:
+                d_str = str(date_val)[:10].strip()
+                if '/' in d_str:
+                    parts = d_str.split('/')
+                    if len(parts[0]) == 4: val_y, val_m, val_d = int(parts[0]), int(parts[1]), int(parts[2])
+                    else: val_y, val_m, val_d = int(parts[2]), int(parts[1]), int(parts[0])
+                elif '-' in d_str:
+                    parts = d_str.split('-')
+                    val_y, val_m, val_d = int(parts[0]), int(parts[1]), int(parts[2])
+                else: return False
+            
+            if y is not None and val_y != y: return False
+            if m is not None and val_m != m: return False
+            if d is not None and val_d != d: return False
+            return True
+        except: return False
 
-        # Cập nhật 4 card thống kê
-        self.view.update_thong_ke(so_luong_den, so_luong_di, so_luong_hoso, so_luong_nhiem_vu)
+    def load_data_den(self):
+        try:
+            ds = self.model_den.get_all(is_admin=self.user_session.is_admin_user(), role=self.user_session.get_role(), ten_don_vi=self.user_session.get_ten_don_vi())
+            self.view.card_den.update_data(len(ds))
+        except: pass
 
-        # Cập nhật danh sách 5 công văn đến mới nhất
-        ds_den_moi = sorted(ds_den, key=lambda x: x.get('ngay_den', ''), reverse=True)[:5]
-        self.view.update_danh_sach_den([{
-            'so_ky_hieu': item.get('so_ky_hieu', ''),
-            'ngay_den': item.get('ngay_den', ''),
-            'trich_yeu': item.get('trich_yeu', '')
-        } for item in ds_den_moi])
+    def load_data_di(self):
+        try: 
+            ds = self.model_di.get_all()
+            self.view.card_di.update_data(len(ds))
+        except: pass
 
-        # Cập nhật danh sách 5 công văn đi mới nhất
-        ds_di_moi = sorted(ds_di, key=lambda x: x.get('ngay_van_ban', ''), reverse=True)[:5]
-        self.view.update_danh_sach_di([{
-            'so_ky_hieu': item.get('so_ky_hieu', ''),
-            'ngay_van_ban': item.get('ngay_van_ban', ''),
-            'noi_nhan': item.get('noi_nhan', '')
-        } for item in ds_di_moi])
+    # ==========================================
+    # HÀM NẠP THẺ VĂN BẢN NỘI BỘ MỚI
+    # ==========================================
+    def load_data_noibo(self):
+        try:
+            # Lấy toàn bộ danh sách văn bản nội bộ bằng hàm get_all() trong ModelNoiBo
+            ds_noibo = self.model_noibo.get_all() 
+            self.view.card_noibo.update_data(len(ds_noibo))
+        except Exception as e:
+            print("Lỗi tải Văn bản nội bộ:", e)
 
-        # Cập nhật bảng nhiệm vụ
-        self.view.update_nhiem_vu(ds_nhiem_vu)
+    def load_data_congviec(self):
+        try: 
+            raw_cv = self.model_congviec.get_cong_viec_cua_toi(self.user_session.user_id, self.user_session.get_role())
+            self.view.card_congviec.update_data(len(raw_cv))
+        except: pass
+
+    def load_tables_and_panel(self):
+        ds_den = self.model_den.get_all(is_admin=self.user_session.is_admin_user(), role=self.user_session.get_role(), ten_don_vi=self.user_session.get_ten_don_vi())
+        try: ds_di = self.model_di.get_all()
+        except: ds_di = []
+        try: self.view.update_table_den(sorted(ds_den, key=lambda x: str(x.get('NgayNhan', x.get('NgayDen', ''))), reverse=True)[:5])
+        except: pass
+        try: self.view.update_table_di(sorted(ds_di, key=lambda x: str(x.get('NgayKy', x.get('NgayBanHanh', ''))), reverse=True)[:5])
+        except: pass
+        try:
+            raw_cv = self.model_congviec.get_cong_viec_cua_toi(self.user_session.user_id, self.user_session.get_role())
+            ds_cv = [r if isinstance(r, dict) else {'Id': getattr(r, 'Id', 0), 'NoiDung': getattr(r, 'NoiDung', ''), 'NgayTao': getattr(r, 'NgayTao', ''), 'TrangThai': getattr(r, 'TrangThai', 0)} for r in raw_cv]
+            self.view.update_task_panel(ds_cv)
+        except: pass
+
+    def load_chart_data(self, *args):
+        try:
+            ds_den = self.model_den.get_all(is_admin=self.user_session.is_admin_user(), role=self.user_session.get_role(), ten_don_vi=self.user_session.get_ten_don_vi())
+            try: ds_di = self.model_di.get_all()
+            except: ds_di = []
+            
+            q_from = self.view.date_from.date()
+            q_to = self.view.date_to.date()
+            
+            d_from = datetime(q_from.year(), q_from.month(), q_from.day())
+            d_to = datetime(q_to.year(), q_to.month(), q_to.day())
+            
+            if d_from > d_to: d_from, d_to = d_to, d_from
+                
+            delta_days = (d_to - d_from).days
+            display_labels, hover_labels, counts_den, counts_di = [], [], [], []
+            
+            if delta_days <= 31:
+                for i in range(delta_days + 1):
+                    curr = d_from + timedelta(days=i)
+                    hover_labels.append(curr.strftime("%d/%m/%Y"))
+                    display_labels.append(curr.strftime("%d/%m") if delta_days <= 10 or i == 0 or i == delta_days or i % 5 == 0 else "")
+                    
+                    counts_den.append(sum(1 for item in ds_den if self._check_date(item.get('NgayNhan') or item.get('NgayDen') or item.get('ngay_den'), d=curr.day, m=curr.month, y=curr.year)))
+                    counts_di.append(sum(1 for item in ds_di if self._check_date(item.get('NgayKy') or item.get('NgayBanHanh') or item.get('ngay_ky'), d=curr.day, m=curr.month, y=curr.year)))
+            else:
+                curr_y, curr_m = d_from.year, d_from.month
+                while (curr_y < d_to.year) or (curr_y == d_to.year and curr_m <= d_to.month):
+                    hover_labels.append(f"Tháng {curr_m}/{curr_y}")
+                    display_labels.append(f"T{curr_m}/{str(curr_y)[2:]}")
+                    
+                    counts_den.append(sum(1 for item in ds_den if self._check_date(item.get('NgayNhan') or item.get('NgayDen') or item.get('ngay_den'), m=curr_m, y=curr_y)))
+                    counts_di.append(sum(1 for item in ds_di if self._check_date(item.get('NgayKy') or item.get('NgayBanHanh') or item.get('ngay_ky'), m=curr_m, y=curr_y)))
+                    
+                    curr_m += 1
+                    if curr_m > 12: curr_m = 1; curr_y += 1
+                        
+            self.view.line_chart.update_chart(display_labels, hover_labels, counts_den, counts_di)
+        except Exception as e:
+            print("Lỗi tải Line Chart:", e)

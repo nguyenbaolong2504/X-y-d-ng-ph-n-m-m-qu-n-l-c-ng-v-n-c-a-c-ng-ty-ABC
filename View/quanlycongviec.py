@@ -5,7 +5,8 @@ from PyQt6.QtWidgets import *
 from PyQt6.QtCore import *
 import pyodbc
 
-from Model.congviec_model import CongViecModel, CongVanDenModel, CongVanDiModel
+from Model.congviec_model import CongViecModel
+from Model.congvan_model import CongVanModel
 
 class ChiTietCongViecDialog(QDialog):
     def __init__(self, cv_id, user_info, conn_str, parent=None):
@@ -407,9 +408,14 @@ class PhanCongDialog(QDialog):
 class QuanLyCongViec(QWidget):
     def __init__(self, user_session, conn_str):
         super().__init__()
-        self.user_id = user_session.user_id
-        self.user_ten = user_session.get_hoten()
-        self.vai_tro = getattr(user_session, 'role', 'Nhân viên')
+        self.user_id = getattr(user_session, 'user_id', 0)
+        
+        # 1. Lấy tên an toàn (giống cách main.py đang làm)
+        self.user_ten = user_session.get_hoten() if hasattr(user_session, 'get_hoten') else "Người dùng"
+        
+        # 2. Lấy vai trò chuẩn xác bằng hàm get_role()
+        self.vai_tro = user_session.get_role() if hasattr(user_session, 'get_role') else "Nhân viên"
+        
         self.user_info = {
             'id': self.user_id,
             'ten': self.user_ten,
@@ -418,8 +424,13 @@ class QuanLyCongViec(QWidget):
         self.conn_str = conn_str
         self.cv_model = CongViecModel(conn_str)
         self.setup_ui()
-        self.load_cong_viec()
-        self.kiem_tra_phan_hoi_moi()
+        
+        # Thêm Try-Catch để nếu Database chưa có tính năng này thì form vẫn mở được
+        try:
+            self.load_cong_viec()
+            self.kiem_tra_phan_hoi_moi()
+        except Exception as e:
+            print(f"Lỗi tải dữ liệu công việc: {e}")
 
     def kiem_tra_phan_hoi_moi(self):
         phan_hoi_list = self.cv_model.get_phan_hoi_moi_cho_nguoi(self.user_id)
@@ -476,7 +487,7 @@ class QuanLyCongViec(QWidget):
             self.load_cong_viec()
 
     def phan_cong_tu_congvan(self):
-        model_cvden = CongVanDenModel(self.conn_str)
+        model_cvden = CongVanModel(self.conn_str)
         ds_cvden = model_cvden.get_all()
         if not ds_cvden:
             QMessageBox.warning(self, "Không có công văn", "Chưa có công văn đến để phân công")
