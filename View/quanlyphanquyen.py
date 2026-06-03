@@ -1,505 +1,163 @@
 from PyQt6.QtWidgets import *
-from PyQt6.QtCore import Qt
-import pyodbc
-
+from PyQt6.QtCore import Qt, pyqtSignal
 
 class QuanLyPhanQuyen(QWidget):
+    load_users_signal = pyqtSignal(str)
+    load_permissions_signal = pyqtSignal(str)
+    save_permissions_signal = pyqtSignal(int, list)
+    add_user_signal = pyqtSignal(dict)
+    update_user_signal = pyqtSignal(str, dict)
+    delete_user_signal = pyqtSignal(str)
 
     def __init__(self):
-
         super().__init__()
+        self.current_username = None
+        self.current_user_id = None
+        self.setup_ui()
 
-        # =====================================================
-        # SQL
-        # =====================================================
-
-        self.conn = pyodbc.connect(
-            "DRIVER={ODBC Driver 17 for SQL Server};"
-            "SERVER=DESKTOP-MRSI227\\SQLEXPRESS;"
-            "DATABASE=congtyabc;"
-            "Trusted_Connection=yes;"
-        )
-
-        cursor = self.conn.cursor()
-
-        cursor.execute("SELECT @@SERVERNAME")
-        print("SERVER =", cursor.fetchone()[0])
-
-        cursor.execute("SELECT DB_NAME()")
-        print("DATABASE =", cursor.fetchone()[0])
-
-        cursor.execute("""
-        SELECT TABLE_NAME
-        FROM INFORMATION_SCHEMA.TABLES
-        WHERE TABLE_NAME='QuyenMenu'
-        """)
-
-        print("QUYENMENU =", cursor.fetchall())
-
-        # =====================================================
-        # LAYOUT
-        # =====================================================
-
-        layout = QVBoxLayout(self)
-
-        # =====================================================
-        # STYLE
-        # =====================================================
-
-        self.setStyleSheet("""
-
-        QWidget{
-            background:#f5f6fa;
-            font-family:Segoe UI;
-        }
-
-        QLabel{
-            color:#2d3436;
-        }
-
-        QFrame{
-            background:white;
-            border-radius:15px;
-        }
-
-        QPushButton{
-            background:#6c5ce7;
-            color:white;
-            border:none;
-            padding:10px 18px;
-            border-radius:10px;
-            font-size:14px;
-            font-weight:bold;
-        }
-
-        QPushButton:hover{
-            background:#5848c2;
-        }
-
-        QLineEdit{
-            padding:10px;
-            border:1px solid #dcdde1;
-            border-radius:10px;
-            background:white;
-        }
-
-        QTableWidget{
-            background:white;
-            border:none;
-            border-radius:10px;
-            gridline-color:#ecf0f1;
-            font-size:13px;
-        }
-
-        QHeaderView::section{
-            background:#6c5ce7;
-            color:white;
-            padding:12px;
-            border:none;
-            font-weight:bold;
-        }
-
-        """)
-
-        # =====================================================
-        # TITLE
-        # =====================================================
+    def setup_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setSpacing(12)
+        main_layout.setContentsMargins(20, 20, 20, 20)
 
         title = QLabel("🔐 QUẢN LÝ PHÂN QUYỀN HỆ THỐNG")
+        title.setStyleSheet("font-size: 26px; font-weight: bold; color: #6c5ce7; padding: 8px 0;")
+        main_layout.addWidget(title)
 
-        title.setStyleSheet("""
-
-            font-size:28px;
-            font-weight:bold;
-            color:#6c5ce7;
-            padding:15px;
-
-        """)
-
-        layout.addWidget(title)
-
-        # =====================================================
-        # TOOLBAR
-        # =====================================================
-
+        # Toolbar
         toolbar = QHBoxLayout()
-
+        self.btn_them = QPushButton("➕ Thêm người dùng")
+        self.btn_sua = QPushButton("✏️ Sửa người dùng")
+        self.btn_xoa = QPushButton("🗑️ Xóa người dùng")
+        self.btn_refresh = QPushButton("🔄 Làm mới")
+        for btn in [self.btn_them, self.btn_sua, self.btn_xoa, self.btn_refresh]:
+            btn.setStyleSheet("background-color: #6c5ce7; color: white; border: none; padding: 8px 15px; border-radius: 8px; font-weight: bold;")
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        toolbar.addWidget(self.btn_them)
+        toolbar.addWidget(self.btn_sua)
+        toolbar.addWidget(self.btn_xoa)
+        toolbar.addWidget(self.btn_refresh)
+        toolbar.addStretch()
+        toolbar.addWidget(QLabel("Tìm tên đăng nhập:"))
         self.txt_search = QLineEdit()
-
-        self.txt_search.setPlaceholderText(
-            "Nhập tên đăng nhập..."
-        )
-
-        btn_reload = QPushButton("🔄 Làm mới")
-
-        btn_reload.clicked.connect(self.load_data)
-
+        self.txt_search.setPlaceholderText("Nhập tên đăng nhập...")
+        self.txt_search.setFixedWidth(200)
+        self.txt_search.setStyleSheet("padding: 8px; border: 1px solid #ddd; border-radius: 8px;")
         toolbar.addWidget(self.txt_search)
+        self.btn_search = QPushButton("🔍 Tìm")
+        self.btn_search.setStyleSheet("background-color: #00b894; color: white; border: none; padding: 8px 15px; border-radius: 8px;")
+        toolbar.addWidget(self.btn_search)
+        main_layout.addLayout(toolbar)
 
-        toolbar.addWidget(btn_reload)
-
-        layout.addLayout(toolbar)
-
-        # =====================================================
-        # TABLE
-        # =====================================================
-
+        # Bảng người dùng
         self.table = QTableWidget()
-
         self.table.setColumnCount(4)
-
-        self.table.setHorizontalHeaderLabels([
-
-            "Tên đăng nhập",
-
-            "Mật khẩu",
-
-            "Vai trò",
-
-            "Họ tên"
-
-        ])
-
+        self.table.setHorizontalHeaderLabels(["Tên đăng nhập", "Mật khẩu", "Vai trò", "Họ tên"])
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.horizontalHeader().setStretchLastSection(True)
-
-        self.table.verticalHeader().setVisible(False)
-
-        self.table.setSelectionBehavior(
-            QTableWidget.SelectionBehavior.SelectRows
-        )
-
         self.table.setAlternatingRowColors(True)
-
-        layout.addWidget(self.table)
-
-        
-        # =====================================================
-        # PHÂN QUYỀN MENU
-        # =====================================================
-
-        permission_frame = QFrame()
-
-        permission_layout = QVBoxLayout(permission_frame)
-
-        title_permission = QLabel("📋 Menu được phép sử dụng")
-
-        title_permission.setStyleSheet("""
-        font-size:18px;
-        font-weight:bold;
-        padding:10px;
+        self.table.setStyleSheet("""
+            QTableWidget { border: none; gridline-color: #e0e0e0; }
+            QHeaderView::section { background-color: #f0f2f5; padding: 10px; font-weight: bold; border: none; }
+            QTableWidget::item { padding: 8px; }
         """)
+        main_layout.addWidget(self.table)
 
-        permission_layout.addWidget(title_permission)
+        # Khung phân quyền menu
+        perm_frame = QFrame()
+        perm_frame.setStyleSheet("background-color: white; border-radius: 12px; padding: 10px; margin-top: 10px;")
+        perm_layout = QVBoxLayout(perm_frame)
+
+        title_perm = QLabel("📋 Menu được phép sử dụng")
+        title_perm.setStyleSheet("font-size: 18px; font-weight: bold; padding: 5px 0;")
+        perm_layout.addWidget(title_perm)
 
         self.menu_list = QListWidget()
+        self.menu_list.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.menu_list.setStyleSheet("""
+            QListWidget { border: 1px solid #ddd; border-radius: 8px; padding: 5px; }
+            QListWidget::item { padding: 8px; border-bottom: 1px solid #f0f0f0; }
+        """)
+        perm_layout.addWidget(self.menu_list)
 
-        self.all_menus = [
+        self.btn_save = QPushButton("💾 Lưu phân quyền")
+        self.btn_save.setStyleSheet("background-color: #e84118; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: bold;")
+        perm_layout.addWidget(self.btn_save)
 
-            "Tổng quan hệ thống",
-            "Văn bản đến",
-            "Văn bản đi",
-            "Văn bản nội bộ",
-            "Văn bản nội bộ của tôi",
-            "Danh sách cán bộ",
-            "Danh mục chức vụ",
-            "Thời hạn bảo quản",
-            "Loại công văn",
-            "Đơn vị, bộ phận",
-            "Phân quyền sử dụng",
-            "Mục lục hồ sơ",
-            "Danh mục hồ sơ",
-            "Công việc"
+        main_layout.addWidget(perm_frame)
 
-        ]
+        # Kết nối
+        self.btn_them.clicked.connect(self.open_them_dialog)
+        self.btn_sua.clicked.connect(self.open_sua_dialog)
+        self.btn_xoa.clicked.connect(self.delete_user)
+        self.btn_refresh.clicked.connect(lambda: self.load_users_signal.emit(self.txt_search.text().strip()))
+        self.btn_search.clicked.connect(lambda: self.load_users_signal.emit(self.txt_search.text().strip()))
+        self.table.itemSelectionChanged.connect(self.on_user_selected)
+        self.btn_save.clicked.connect(self.save_permission)
 
-        for menu in self.all_menus:
+    def set_users(self, users):
+        self.table.setRowCount(len(users))
+        for i, u in enumerate(users):
+            self.table.setItem(i, 0, QTableWidgetItem(u['Username']))
+            self.table.setItem(i, 1, QTableWidgetItem(u['Password']))
+            self.table.setItem(i, 2, QTableWidgetItem(u['VaiTro']))
+            self.table.setItem(i, 3, QTableWidgetItem(u['HoTen']))
+        self.table.resizeColumnsToContents()
 
-            item = QListWidgetItem(menu)
-
-            item.setFlags(
-                item.flags() |
-                Qt.ItemFlag.ItemIsUserCheckable
-            )
-
-            item.setCheckState(
-                Qt.CheckState.Unchecked
-            )
-
+    def set_menus(self, menus):
+        self.menu_list.clear()
+        for m in menus:
+            item = QListWidgetItem(m['TenMenu'])
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Unchecked)
+            item.setData(Qt.ItemDataRole.UserRole, m['Id'])
             self.menu_list.addItem(item)
 
-        permission_layout.addWidget(self.menu_list)
-
-        self.btn_save_permission = QPushButton(
-            "💾 Lưu phân quyền"
-        )
-        self.table.itemSelectionChanged.connect( 
-            self.load_permission 
-        ) 
-        self.btn_save_permission.clicked.connect( 
-            self.save_permission 
-        )
-
-        permission_layout.addWidget(
-            self.btn_save_permission
-        )
-
-        layout.addWidget(permission_frame)
-
-        # =====================================================
-        # INFO PANEL
-        # =====================================================
-
-        info = QFrame()
-
-        info_layout = QVBoxLayout(info)
-
-        lbl = QLabel("""
-
-
-""")
-
-        lbl.setStyleSheet("""
-
-            font-size:16px;
-            line-height:30px;
-            padding:15px;
-
-        """)
-
-        info_layout.addWidget(lbl)
-
-        layout.addWidget(info)
-
-        # =====================================================
-        # LOAD DATA
-        # =====================================================
-
-        self.load_data()
-
-    # =========================================================
-    # LOAD DATA
-    # =========================================================
-
-    def load_data(self):
-
-        cursor = self.conn.cursor()
-
-        sql = """
-
-        SELECT
-
-            Username,
-
-            Password,
-
-            CASE
-
-                WHEN IsAdmin = 1 THEN N'Admin'
-
-                WHEN NhomQuyenId = 1 THEN N'Giám đốc'
-
-                WHEN NhomQuyenId = 2 THEN N'Trưởng phòng'
-
-                ELSE N'Nhân viên'
-
-            END AS VaiTro,
-
-            HoTen
-
-        FROM CanBo
-
-        WHERE Username IS NOT NULL
-
-        """
-
-        keyword = self.txt_search.text().strip()
-
-        if keyword != "":
-
-            sql += " AND Username LIKE ? "
-
-            cursor.execute(sql, ('%' + keyword + '%',))
-
-        else:
-
-            cursor.execute(sql)
-
-        data = cursor.fetchall()
-
-        self.table.setRowCount(len(data))
-
-        for row_idx, row_data in enumerate(data):
-
-            for col_idx, value in enumerate(row_data):
-
-                item = QTableWidgetItem(str(value))
-
-                self.table.setItem(row_idx, col_idx, item)
-
-    def load_permission(self):
-
-        try:
-
-            row = self.table.currentRow()
-
-            if row < 0:
-                return
-
-            item = self.table.item(row, 0)
-
-            if item is None:
-                return
-
-            username = item.text()
-
-            cursor = self.conn.cursor()
-
-            # Lấy CanBoId
-            cursor.execute("""
-                SELECT Id
-                FROM CanBo
-                WHERE Username = ?
-            """, (username,))
-
-            canbo = cursor.fetchone()
-
-            if not canbo:
-                return
-
-            canbo_id = canbo[0]
-
-            # Bỏ tick toàn bộ trước
-            for i in range(self.menu_list.count()):
-                self.menu_list.item(i).setCheckState(
-                    Qt.CheckState.Unchecked
-                )
-
-            # Lấy quyền đã cấp
-            cursor.execute("""
-                SELECT m.TenMenu
-                FROM dbo.QuyenMenu q
-                INNER JOIN dbo.MenuHeThong m
-                    ON q.MenuId = m.Id
-                WHERE q.CanBoId = ?
-                AND q.DuocXem = 1
-            """, (canbo_id,))
-
-            menus = [row[0] for row in cursor.fetchall()]
-
-            for i in range(self.menu_list.count()):
-
-                item = self.menu_list.item(i)
-
-                if item.text() in menus:
-
-                    item.setCheckState(
-                        Qt.CheckState.Checked
-                    )
-
-        except Exception as e:
-
-            QMessageBox.critical(
-                self,
-                "Lỗi",
-                str(e)
-            )
-
+    def set_permissions(self, menu_ids):
+        for i in range(self.menu_list.count()):
+            item = self.menu_list.item(i)
+            menu_id = item.data(Qt.ItemDataRole.UserRole)
+            item.setCheckState(Qt.CheckState.Checked if menu_id in menu_ids else Qt.CheckState.Unchecked)
+
+    def on_user_selected(self):
+        row = self.table.currentRow()
+        if row < 0:
+            self.current_username = None
+            self.current_user_id = None
+            return
+        self.current_username = self.table.item(row, 0).text()
+        self.load_permissions_signal.emit(self.current_username)
 
     def save_permission(self):
+        if self.current_user_id is None:
+            QMessageBox.warning(self, "Chưa chọn", "Vui lòng chọn người dùng trước khi lưu phân quyền!")
+            return
+        selected_ids = []
+        for i in range(self.menu_list.count()):
+            item = self.menu_list.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                selected_ids.append(item.data(Qt.ItemDataRole.UserRole))
+        self.save_permissions_signal.emit(self.current_user_id, selected_ids)
 
-        try:
+    def open_them_dialog(self):
+        self.add_user_signal.emit({})
 
-            row = self.table.currentRow()
+    def open_sua_dialog(self):
+        row = self.table.currentRow()
+        if row < 0:
+            QMessageBox.warning(self, "Chưa chọn", "Vui lòng chọn người dùng cần sửa!")
+            return
+        username = self.table.item(row, 0).text()
+        self.update_user_signal.emit(username, {})
 
-            if row < 0:
-
-                QMessageBox.warning(
-                    self,
-                    "Thông báo",
-                    "Vui lòng chọn người dùng"
-                )
-
-                return
-
-            username = self.table.item(row, 0).text()
-
-            cursor = self.conn.cursor()
-
-            # Lấy CanBoId
-            cursor.execute("""
-                SELECT Id
-                FROM CanBo
-                WHERE Username = ?
-            """, (username,))
-
-            canbo = cursor.fetchone()
-
-            if not canbo:
-
-                QMessageBox.warning(
-                    self,
-                    "Lỗi",
-                    "Không tìm thấy cán bộ"
-                )
-
-                return
-
-            canbo_id = canbo[0]
-
-            # Xóa quyền cũ
-            cursor.execute("""
-                DELETE FROM dbo.QuyenMenu
-                WHERE CanBoId = ?
-            """, (canbo_id,))
-
-            # Thêm quyền mới
-            for i in range(self.menu_list.count()):
-
-                item = self.menu_list.item(i)
-
-                if item.checkState() == Qt.CheckState.Checked:
-
-                    cursor.execute("""
-                        SELECT Id
-                        FROM dbo.MenuHeThong
-                        WHERE TenMenu = ?
-                    """, (item.text(),))
-
-                    menu = cursor.fetchone()
-
-                    if menu:
-
-                        menu_id = menu[0]
-
-                        cursor.execute("""
-                            INSERT INTO dbo.QuyenMenu
-                            (
-                                CanBoId,
-                                MenuId,
-                                DuocXem
-                            )
-                            VALUES
-                            (
-                                ?, ?, 1
-                            )
-                        """,
-                        (
-                            canbo_id,
-                            menu_id
-                        ))
-
-            self.conn.commit()
-
-            QMessageBox.information(
-                self,
-                "Thành công",
-                f"Đã lưu phân quyền cho {username}"
-            )
-
-        except Exception as e:
-
-            QMessageBox.critical(
-                self,
-                "Lỗi",
-                str(e)
-            )
+    def delete_user(self):
+        row = self.table.currentRow()
+        if row < 0:
+            QMessageBox.warning(self, "Chưa chọn", "Vui lòng chọn người dùng cần xóa!")
+            return
+        username = self.table.item(row, 0).text()
+        reply = QMessageBox.question(self, "Xác nhận", f"Xóa người dùng '{username}'?",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            self.delete_user_signal.emit(username)

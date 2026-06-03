@@ -25,7 +25,7 @@ class ModelNoiBo:
     def _get_connection(self):
         return pyodbc.connect(self.conn_str)
 
-    def get_all(self, keyword=""):
+    def get_all(self, keyword="", user_id=None, is_admin=False):
         with self._get_connection() as conn:
             cursor = conn.cursor()
             query = """
@@ -43,11 +43,15 @@ class ModelNoiBo:
                 LEFT JOIN LoaiCongVan loai ON vb.LoaiCongVanId = loai.Id
                 LEFT JOIN DonViTrucThuoc donvi ON vb.DonViSoanId = donvi.Id
                 LEFT JOIN CanBo nguoiky ON vb.NguoiKyId = nguoiky.Id
+                WHERE 1=1
             """
             params = []
             if keyword:
-                query += " WHERE vb.KyHieu LIKE ? OR vb.TrichYeu LIKE ?"
-                params = [f"%{keyword}%", f"%{keyword}%"]
+                query += " AND (vb.KyHieu LIKE ? OR vb.TrichYeu LIKE ?)"
+                params.extend([f"%{keyword}%", f"%{keyword}%"])
+            if not is_admin and user_id:
+                query += " AND vb.NguoiTaoId = ?"
+                params.append(user_id)
             query += " ORDER BY vb.NgayBanHanh DESC"
             cursor.execute(query, params)
             columns = [col[0] for col in cursor.description]
@@ -55,8 +59,6 @@ class ModelNoiBo:
             return [dict(zip(columns, row)) for row in rows]
 
     def add(self, data: Dict, nguoi_tao_id=1):
-        print("\n[DEBUG add] Bắt đầu thêm văn bản nội bộ")
-        print(f"[DEBUG add] NguoiNhanList nhận được: {data.get('NguoiNhanList', [])}")
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
@@ -89,17 +91,12 @@ class ModelNoiBo:
                     file_path
                 ))
                 new_id = cursor.execute("SELECT @@IDENTITY").fetchval()
-                print(f"[DEBUG add] ID văn bản mới: {new_id}")
                 nguoi_nhan_ids = data.get("NguoiNhanList", [])
                 if nguoi_nhan_ids:
-                    print(f"[DEBUG add] Đang lưu {len(nguoi_nhan_ids)} người nhận vào CongVanNoBao_NguoiNhan: {nguoi_nhan_ids}")
                     for nid in nguoi_nhan_ids:
                         cursor.execute("INSERT INTO CongVanNoBao_NguoiNhan (CongVanNoiBoId, NguoiNhanId, DaXem) VALUES (?, ?, 0)", (new_id, nid))
                     self._tao_cong_viec_noi_bo(new_id, nguoi_nhan_ids, cursor)
-                else:
-                    print("[DEBUG add] Không có người nhận nào được chọn")
                 conn.commit()
-                print("[DEBUG add] Thêm thành công!")
                 return new_id
         except Exception as e:
             print(f"[ERROR] add: {e}")
@@ -113,17 +110,13 @@ class ModelNoiBo:
                 cursor.execute("SELECT Id FROM CongViecNoiBo WHERE NoiBoId=? AND NguoiNhanId=?", (noibo_id, nid))
                 if not cursor.fetchone():
                     cursor.execute("INSERT INTO CongViecNoiBo (NoiBoId, NguoiNhanId, TrangThai, NgayTao) VALUES (?, ?, 0, GETDATE())", (noibo_id, nid))
-                    print(f"[DEBUG] Đã tạo CongViecNoiBo cho người nhận {nid}")
         except Exception as e:
             print(f"[ERROR] _tao_cong_viec_noi_bo: {e}")
 
     def update(self, id: int, data: Dict):
-        print(f"\n[DEBUG update] Cập nhật văn bản ID={id}")
-        print(f"[DEBUG update] NguoiNhanList nhận được: {data.get('NguoiNhanList', [])}")
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
-                # 1. Cập nhật thông tin chính
                 loai_id = self._get_loai_id(data.get("LoaiVanBan"))
                 donvi_id = self._get_donvi_id(data.get("DonViSoan"))
                 nguoiky_id = self._get_canbo_id(data.get("NguoiKy"))
@@ -146,23 +139,14 @@ class ModelNoiBo:
                     file_path,
                     id
                 ))
-                # 2. Xóa toàn bộ người nhận cũ
                 cursor.execute("DELETE FROM CongVanNoBao_NguoiNhan WHERE CongVanNoiBoId=?", (id,))
                 cursor.execute("DELETE FROM CongViecNoiBo WHERE NoiBoId=?", (id,))
-                print(f"[DEBUG update] Đã xóa dữ liệu cũ")
-
-                # 3. Thêm lại danh sách người nhận mới
                 nguoi_nhan_ids = data.get("NguoiNhanList", [])
                 if nguoi_nhan_ids:
-                    print(f"[DEBUG update] Thêm mới {len(nguoi_nhan_ids)} người nhận: {nguoi_nhan_ids}")
                     for nid in nguoi_nhan_ids:
                         cursor.execute("INSERT INTO CongVanNoBao_NguoiNhan (CongVanNoiBoId, NguoiNhanId, DaXem) VALUES (?, ?, 0)", (id, nid))
                         cursor.execute("INSERT INTO CongViecNoiBo (NoiBoId, NguoiNhanId, TrangThai, NgayTao) VALUES (?, ?, 0, GETDATE())", (id, nid))
-                        print(f"[DEBUG] Đã thêm người nhận {nid}")
-                else:
-                    print("[DEBUG update] Không có người nhận nào được chọn")
                 conn.commit()
-                print("[DEBUG update] Cập nhật thành công")
         except Exception as e:
             print(f"[ERROR] update: {e}")
             import traceback
@@ -188,9 +172,7 @@ class ModelNoiBo:
                     WHERE nn.CongVanNoiBoId = ?
                 """, noibo_id)
                 rows = cursor.fetchall()
-                result = [{"id": row[0], "ten": row[1]} for row in rows]
-                print(f"[DEBUG get_nguoi_nhan_list] ID văn bản={noibo_id}, số người nhận={len(result)}: {result}")
-                return result
+                return [{"id": row[0], "ten": row[1]} for row in rows]
         except Exception as e:
             print(f"[ERROR] get_nguoi_nhan_list: {e}")
             return []
@@ -217,9 +199,7 @@ class ModelNoiBo:
                 cursor.execute(sql, params)
                 columns = [col[0] for col in cursor.description]
                 rows = cursor.fetchall()
-                result = [dict(zip(columns, row)) for row in rows]
-                print(f"[DEBUG get_van_ban_noi_bo_cua_toi] Người dùng ID={nguoi_dung_id}, tìm thấy {len(result)} văn bản")
-                return result
+                return [dict(zip(columns, row)) for row in rows]
         except Exception as e:
             print(f"[ERROR] get_van_ban_noi_bo_cua_toi: {e}")
             return []
@@ -258,7 +238,6 @@ class ModelNoiBo:
                     WHERE NoiBoId = ? AND NguoiNhanId = ?
                 """, (noibo_id, nguoi_dung_id))
                 conn.commit()
-                print(f"[DEBUG] Đánh dấu đã xem: noibo_id={noibo_id}, nguoi_dung_id={nguoi_dung_id}")
         except Exception as e:
             print(f"[ERROR] danh_dau_da_xem: {e}")
 

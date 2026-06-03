@@ -1,4 +1,6 @@
 import sys, os, pyodbc
+
+import View
 _original_pyodbc_connect = pyodbc.connect
 def _intercept_connect(*args, **kwargs):
     my_local_conn_str = ( 
@@ -49,8 +51,10 @@ from View.quanlycongvandi import MainWindowDi
 from Controller.congvandi_controller import CongVanDiController
 from View.login import LoginWindow
 from View.quanlyphanquyen import QuanLyPhanQuyen
-from View.danhmuchoso import QuanLyHoSo  # ✅ Đã import đúng
+from View.quanlyhoso import QuanLyHoSo  # ✅ Đã import đúng
 from View.quanlycongviec import QuanLyCongViec
+from Model.phanquyen_model import PhanQuyenModel
+from Controller.phanquyen_controller import PhanQuyenController
 ModelNoiBo, NOIBO_OK = safe_import("Model.model_noibo", "ModelNoiBo")
 MainWindowNoiBo, _ = safe_import("View.view_noibo", "MainWindowNoiBo")
 DonViModel, DV_OK = safe_import("Model.donvi_model", "DonViModel")
@@ -330,13 +334,13 @@ class MainApp(QMainWindow):
         self.den_controller = CongVanController(CongVanModel(), self.tab_den, self.user_session)
         self.stacked_widget.addWidget(self.tab_den)
         
-        self.tab_di = MainWindowDi()
+        self.tab_di = MainWindowDi(self.user_session)
         self.di_controller = CongVanDiController(CongVanDiModel(), self.tab_di, self.user_session)
         self.stacked_widget.addWidget(self.tab_di)
         
         if NOIBO_OK:
             self.tab_noibo = MainWindowNoiBo()
-            self.noibo_controller = ControllerNoiBo(ModelNoiBo(), self.tab_noibo)
+            self.noibo_controller = ControllerNoiBo(ModelNoiBo(), self.tab_noibo, self.user_session)
             self.stacked_widget.addWidget(self.tab_noibo)
         else:
             self.stacked_widget.addWidget(QLabel("Nội bộ chưa sẵn sàng"))
@@ -417,11 +421,11 @@ class MainApp(QMainWindow):
 
         try:
             self.tab_phanquyen = QuanLyPhanQuyen()
+            phanquyen_model = PhanQuyenModel()
+            self.phanquyen_controller = PhanQuyenController(phanquyen_model, self.tab_phanquyen)
             self.stacked_widget.addWidget(self.tab_phanquyen)
         except Exception as e:
-            self.stacked_widget.addWidget(
-                QLabel(f"❌ Lỗi phân quyền: {str(e)}")
-            )
+            self.stacked_widget.addWidget(QLabel(f"❌ Lỗi phân quyền: {str(e)}"))
 
 
         # =============================================================
@@ -429,16 +433,12 @@ class MainApp(QMainWindow):
         # =============================================================
 
         try:
-            self.quanlyhoso_page = QuanLyHoSo()  # ✅ Sử dụng class QuanLyHoSo
+            self.quanlyhoso_page = QuanLyHoSo(CONN_STR)   # Truyền CONN_STR
             self.stacked_widget.addWidget(self.quanlyhoso_page)
         except Exception as e:
-            self.stacked_widget.addWidget(
-                QLabel(f"❌ Lỗi quản lý hồ sơ: {str(e)}")
-            )
+            self.stacked_widget.addWidget(QLabel(f"❌ Lỗi quản lý hồ sơ: {str(e)}"))
 
-        # =============================================================
-        # 13. CÔNG VIỆC
-        # =============================================================
+       
 
         # =============================================================
         # 13. CÔNG VIỆC
@@ -473,7 +473,7 @@ class MainApp(QMainWindow):
             2: 1,   # Văn bản đến
             3: 2,   # Văn bản đi
             4: 3,   # Văn bản nội bộ
-            5: 13,  # Văn bản nội bộ của tôi
+            5: 12,  # Văn bản nội bộ của tôi
             6: 4,   # Cán bộ
             7: 5,   # Chức vụ
             8: 6,   # Hạn bảo quản

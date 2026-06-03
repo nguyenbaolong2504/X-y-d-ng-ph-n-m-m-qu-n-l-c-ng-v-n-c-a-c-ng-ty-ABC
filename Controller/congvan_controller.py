@@ -35,7 +35,6 @@ class CongVanController:
         ]
 
     def nap_danh_muc(self):
-        # 1. Nạp danh sách cán bộ xử lý
         try:
             ds_can_bo = self.model.get_danh_sach_can_bo()
             if hasattr(self.view, 'set_nhan_su_list') and ds_can_bo:
@@ -44,15 +43,11 @@ class CongVanController:
         except Exception as e:
             self._handle_error(f"Lỗi nạp danh sách cán bộ: {str(e)}")
 
-        # 2. Nạp danh sách Loại văn bản đến từ Database (SỬA TẠI ĐÂY)
         try:
-            # Lấy chuỗi kết nối an toàn từ model
-            conn_str = getattr(self.model, 'conn_str', None) or getattr(self.model, 'connection_string', None)
-            
+            conn_str = getattr(self.model, 'connection_string', None) or getattr(self.model, 'conn_str', None)
             if conn_str:
                 loai_cv_model = LoaiCongVanModel(conn_str)
-                ds_loai_cv = loai_cv_model.get_all(trang_thai=1) # Lấy loại Đến (1) và Dùng chung (3)
-                
+                ds_loai_cv = loai_cv_model.get_all(trang_thai=1)
                 if hasattr(self.view, 'set_loai_van_ban_list') and ds_loai_cv:
                     danh_sach_loai = [{
                         'id': x.get('Id'), 
@@ -62,6 +57,18 @@ class CongVanController:
                         'TenLoai': x.get('TenLoai')
                     } for x in ds_loai_cv]
                     self.view.set_loai_van_ban_list(danh_sach_loai)
+            else:
+                if hasattr(self.model, 'get_loai_van_ban'):
+                    ds_loai_cv = self.model.get_loai_van_ban()
+                    if hasattr(self.view, 'set_loai_van_ban_list') and ds_loai_cv:
+                        danh_sach_loai = [{
+                            'id': x.get('id'), 
+                            'Id': x.get('id'), 
+                            'ten': x.get('ten_loai'), 
+                            'ten_loai': x.get('ten_loai'), 
+                            'TenLoai': x.get('ten_loai')
+                        } for x in ds_loai_cv]
+                        self.view.set_loai_van_ban_list(danh_sach_loai)
         except Exception as e:
             self._handle_error(f"Lỗi nạp danh mục loại văn bản: {str(e)}")
 
@@ -84,11 +91,12 @@ class CongVanController:
             tu = self.view.date_tu_ngay.date().toString("yyyy-MM-dd")
             den = self.view.date_den_ngay.date().toString("yyyy-MM-dd")
             loai_id = self.view.cb_loai_vb.currentData()
+            muc_do = self.view.cb_muc_do.currentText() if hasattr(self.view, 'cb_muc_do') else None
             if self.view.chk_bo_qua_ngay.isChecked():
                 tu = None
                 den = None
             data = self.model.filter_by_criteria(
-                tu, den, loai_id,
+                tu, den, loai_id, muc_do,
                 is_admin=self.user_session.is_admin_user(),
                 role=self.user_session.get_role(),
                 ten_don_vi=self.user_session.get_ten_don_vi()
@@ -151,6 +159,16 @@ class CongVanController:
 
     def xoa_cong_van(self, id_cv: int):
         try:
+            conn = self.model._get_connection()
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM LichSuXuLy WHERE CongVanDenId = ?", (id_cv,))
+            cursor.execute("DELETE FROM PhanCongXuLy WHERE CongVanDenId = ?", (id_cv,))
+            try:
+                cursor.execute("DELETE FROM CongVanDen_CanBo WHERE VanBanDenId = ?", (id_cv,))
+            except:
+                pass
+            conn.commit()
+            conn.close()
             self.model.delete(id_cv)
             self.load_data()
             self.view.show_status(f"Đã xóa công văn ID {id_cv}")
@@ -169,46 +187,87 @@ class CongVanController:
                 self.view.show_error("Không thể lấy danh sách cán bộ!")
                 return
 
-            dialog = ChuyenXuLyDialog(ds_can_bo, self.view)
-            dialog.setWindowTitle("Phân công xử lý công văn thành công việc")
+            conn_str = self.model.get_connection_string()
+            cv_model = CongViecModel(conn_str)
+
+            dialog = ChuyenXuLyDialog(ds_can_bo, cv_model, id_cv, self.view)
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 data = dialog.get_data()
-                nguoi_nhan_id = data.get('chu_tri_id')
-                print(f"[DEBUG] Người nhận ID: {nguoi_nhan_id}, loại: {type(nguoi_nhan_id)}")
-                if not nguoi_nhan_id:
-                    self.view.show_error("Chưa chọn người xử lý!")
+                chu_tri_id = data.get('chu_tri_id')
+                if not chu_tri_id:
+                    self.view.show_error("Chưa chọn người chủ trì (người duyệt)!")
                     return
-
-                # Ép kiểu về int để tránh lỗi
                 try:
-                    nguoi_nhan_id = int(nguoi_nhan_id)
-                except (TypeError, ValueError):
-                    self.view.show_error("ID người xử lý không hợp lệ!")
+                    chu_tri_id = int(chu_tri_id)
+                except:
+                    self.view.show_error("ID người chủ trì không hợp lệ!")
                     return
 
-                conn_str = self.model.get_connection_string()
-                cv_model = CongViecModel(conn_str)
                 noi_dung_task = data.get('noi_dung', '').strip()
                 if not noi_dung_task:
                     noi_dung_task = f"Xử lý công văn: {cv_info.get('KyHieu', '')} - {cv_info.get('TrichYeu', '')}"
-                han_xl = data.get('ngay_xu_ly')
+                han_xl = data.get('ngay_han')
                 if not han_xl:
                     han_xl = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
+                yeu_cau = data.get('yeu_cau_xu_ly', '')
 
-                new_task_id = cv_model.them(
-                    id_cv_den=id_cv,
-                    noi_dung=noi_dung_task,
-                    nguoi_giao=self.user_session.user_id,
-                    nguoi_nhan=nguoi_nhan_id,
-                    han_xu_ly=han_xl
-                )
-                print(f"[DEBUG] Đã tạo công việc ID: {new_task_id} cho người {nguoi_nhan_id}")
-                cv_model.them_lich_su(new_task_id, self.user_session.user_id, "Phân công",
-                                      f"Giao cho {data.get('chu_tri_ten', '')} xử lý công văn {cv_info.get('KyHieu', '')}")
-                self.view.show_status(f"Đã tạo công việc và giao cho {data.get('chu_tri_ten', '')}")
-                self.model.update_trang_thai(id_cv, 2)
+                existing = data.get('existing_tasks', [])
+                new_tham_gia_ids = data.get('tham_gia_ids', [])
+                if chu_tri_id not in new_tham_gia_ids:
+                    new_tham_gia_ids.append(chu_tri_id)
+                new_all_ids = set([chu_tri_id] + new_tham_gia_ids)
+                old_all_ids = set([t['nguoi_id'] for t in existing])
+
+                for task in existing:
+                    if task['nguoi_id'] not in new_all_ids:
+                        cv_model.delete(task['id'])
+
+                for nguoi_id in new_all_ids:
+                    if nguoi_id not in old_all_ids:
+                        is_chu_tri = 1 if nguoi_id == chu_tri_id else 0
+                        new_id = cv_model.them(
+                            id_cv_den=id_cv,
+                            noi_dung=noi_dung_task,
+                            nguoi_giao=self.user_session.user_id,
+                            nguoi_nhan=nguoi_id,
+                            han_xu_ly=han_xl,
+                            is_chu_tri=is_chu_tri
+                        )
+                        cv_model.them_lich_su(new_id, self.user_session.user_id,
+                                              "Phân công" + (" (chủ trì)" if is_chu_tri else " (tham gia)"),
+                                              f"Giao cho {nguoi_id} xử lý công văn {cv_info.get('KyHieu', '')}")
+
+                conn = cv_model._get_connection()
+                cursor = conn.cursor()
+                for task in existing:
+                    if task['nguoi_id'] in new_all_ids:
+                        new_is_chu_tri = 1 if task['nguoi_id'] == chu_tri_id else 0
+                        cursor.execute("""
+                            UPDATE PhanCongXuLy
+                            SET NoiDung = ?, HanXuLy = ?, KetQua = ?, IsChuTri = ?
+                            WHERE Id = ?
+                        """, (noi_dung_task, han_xl, yeu_cau, new_is_chu_tri, task['id']))
+                conn.commit()
+                conn.close()
+
+                self.model.update_nguoi_xu_ly(id_cv, chu_tri_id)
+                # Khi phân công xong -> chuyển trạng thái thành Đang xử lý (2)
+                self.model.update_trang_thai_cv(id_cv, 2)
+                self.load_data()
+                self.view.show_status(f"Đã cập nhật {len(new_all_ids)} công việc. Chủ trì: {data.get('chu_tri_ten', '')}")
         except Exception as e:
             self.view.show_error(f"Lỗi phân công: {str(e)}")
+
+    # ========== THÊM METHOD HOÀN THÀNH CÔNG VIỆC (gọi từ Task View) ==========
+    def hoan_thanh_cong_viec(self, id_cv: int):
+        """Gọi khi chủ trì duyệt task -> chuyển công văn sang Hoàn thành (3)"""
+        try:
+            self.model.update_trang_thai_cv(id_cv, 3)
+            self.load_data()
+            self.view.show_status(f"Công văn ID {id_cv} đã hoàn thành")
+        except Exception as e:
+            self.view.show_error(f"Lỗi cập nhật hoàn thành: {str(e)}")
+    # ==========================================================================
 
     def _update_table_view(self, data: list):
         self.table_model = CongVanTableModel(data, self.get_headers())

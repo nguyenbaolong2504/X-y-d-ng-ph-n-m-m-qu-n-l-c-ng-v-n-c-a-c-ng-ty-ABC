@@ -79,7 +79,6 @@ class NoiBoNhanWidget(QWidget):
     def load_data(self):
         chi_chua_xem = self.chk_chua_xem.isChecked()
         data = self.model.get_van_ban_noi_bo_cua_toi(self.user_id, chi_chua_xem)
-        print(f"[DEBUG NoiBoNhanWidget] load_data: user_id={self.user_id}, rows={len(data)}")
         self.table.setRowCount(len(data))
         for i, row in enumerate(data):
             self.table.setItem(i, 0, QTableWidgetItem(str(row.get('Id', ''))))
@@ -93,7 +92,6 @@ class NoiBoNhanWidget(QWidget):
             self.table.setItem(i, 7, QTableWidgetItem(trangthai))
             self.table.setItem(i, 8, QTableWidgetItem(str(row.get('NgayTao', ''))))
         self.table.resizeColumnsToContents()
-        print(f"[DEBUG NoiBoNhanWidget] Đã hiển thị {len(data)} dòng")
 
     def xem_chi_tiet(self):
         row = self.table.currentRow()

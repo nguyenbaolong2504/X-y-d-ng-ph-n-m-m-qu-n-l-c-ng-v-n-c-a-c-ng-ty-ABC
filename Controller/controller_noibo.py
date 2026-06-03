@@ -2,9 +2,10 @@ from Model.model_noibo import ModelNoiBo, NoiBoTableModel
 from PyQt6.QtWidgets import QMessageBox
 
 class ControllerNoiBo:
-    def __init__(self, model: ModelNoiBo, view):
+    def __init__(self, model: ModelNoiBo, view, user_session):
         self.model = model
         self.view = view
+        self.user_session = user_session
         self.view.set_model(model)
         self.connect_signals()
         self.load_danh_muc()
@@ -26,7 +27,11 @@ class ControllerNoiBo:
 
     def load_data(self, keyword=""):
         try:
-            data = self.model.get_all(keyword)
+            data = self.model.get_all(
+                keyword=keyword,
+                user_id=self.user_session.user_id,
+                is_admin=self.user_session.is_admin_user()
+            )
             self.table_model = NoiBoTableModel(data)
             self.view.set_table_model(self.table_model)
             self.view.show_status(f"Đã tải {len(data)} văn bản nội bộ.")
@@ -35,7 +40,7 @@ class ControllerNoiBo:
 
     def handle_them(self, data):
         try:
-            nguoi_tao_id = 1  # Sau này thay bằng user_session.user_id
+            nguoi_tao_id = self.user_session.user_id  # dùng ID thực tế
             self.model.add(data, nguoi_tao_id)
             self.load_data()
             self.view.show_status("Thêm thành công!")

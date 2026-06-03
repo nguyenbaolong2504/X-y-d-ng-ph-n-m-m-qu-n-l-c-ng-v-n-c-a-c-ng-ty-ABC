@@ -11,8 +11,6 @@ class CongViecModel:
     def get_cong_viec_cua_toi(self, nguoi_dung_id, vai_tro):
         conn = self._get_connection()
         cursor = conn.cursor()
-        
-        # Gộp Admin và Giám đốc thành nhóm có quyền xem toàn bộ công việc
         if vai_tro in ["Giám đốc", "Admin"]:
             sql = """
                 SELECT pc.Id, pc.NoiDung, cb_g.HoTen AS NguoiGiao, cb_n.HoTen AS NguoiNhan,
@@ -24,7 +22,6 @@ class CongViecModel:
             """
             cursor.execute(sql)
         else:
-            # Các vai trò khác (Trưởng phòng, Nhân viên) chỉ xem việc của mình (nhận hoặc giao)
             sql = """
                 SELECT pc.Id, pc.NoiDung, cb_g.HoTen AS NguoiGiao, cb_n.HoTen AS NguoiNhan,
                        pc.TrangThai, pc.HanXuLy, pc.NgayTao
@@ -35,7 +32,6 @@ class CongViecModel:
                 ORDER BY pc.NgayTao DESC
             """
             cursor.execute(sql, (nguoi_dung_id, nguoi_dung_id))
-            
         rows = cursor.fetchall()
         conn.close()
         return rows
@@ -45,21 +41,21 @@ class CongViecModel:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT Id, CongVanDenId, DonViDuocGiaoId, NguoiDuocGiaoId, HanXuLy, NoiDung,
-                   NguoiGiaoId, TrangThai, KetQua, FileKetQua, YKienDuyet, NgayNop, NgayTao
+                   NguoiGiaoId, TrangThai, KetQua, FileKetQua, YKienDuyet, NgayNop, NgayTao, IsChuTri
             FROM PhanCongXuLy WHERE Id = ?
         """, cv_id)
         row = cursor.fetchone()
         conn.close()
         return row
 
-    def them(self, id_cv_den, noi_dung, nguoi_giao, nguoi_nhan, han_xu_ly):
+    def them(self, id_cv_den, noi_dung, nguoi_giao, nguoi_nhan, han_xu_ly, is_chu_tri=0):
         conn = self._get_connection()
         cursor = conn.cursor()
         ngay_tao = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         cursor.execute("""
-            INSERT INTO PhanCongXuLy (CongVanDenId, NguoiDuocGiaoId, HanXuLy, NoiDung, NguoiGiaoId, TrangThai, NgayTao, NgayNop)
-            VALUES (?, ?, ?, ?, ?, 1, ?, NULL)
-        """, (id_cv_den, nguoi_nhan, han_xu_ly, noi_dung, nguoi_giao, ngay_tao))
+            INSERT INTO PhanCongXuLy (CongVanDenId, NguoiDuocGiaoId, HanXuLy, NoiDung, NguoiGiaoId, TrangThai, NgayTao, NgayNop, IsChuTri)
+            VALUES (?, ?, ?, ?, ?, 1, ?, NULL, ?)
+        """, (id_cv_den, nguoi_nhan, han_xu_ly, noi_dung, nguoi_giao, ngay_tao, is_chu_tri))
         conn.commit()
         new_id = cursor.execute("SELECT @@IDENTITY").fetchval()
         conn.close()
@@ -97,9 +93,7 @@ class CongViecModel:
     def cap_nhat_ngay_nop(self, cv_id):
         conn = self._get_connection()
         cursor = conn.cursor()
-        cursor.execute("""
-            UPDATE PhanCongXuLy SET NgayNop = ? WHERE Id = ?
-        """, (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), cv_id))
+        cursor.execute("UPDATE PhanCongXuLy SET NgayNop = ? WHERE Id = ?", (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), cv_id))
         conn.commit()
         conn.close()
 
@@ -165,10 +159,14 @@ class CongViecModel:
         conn.close()
         return rows
 
+    def delete(self, cv_id: int):
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM PhanCongXuLy WHERE Id = ?", (cv_id,))
+        conn.commit()
+        conn.close()
 
-# =======================================================
-# KHÔI PHỤC LẠI 2 CLASS BỊ MẤT
-# =======================================================
+
 class CongVanDenModel:
     def __init__(self, conn_str):
         self.conn_str = conn_str

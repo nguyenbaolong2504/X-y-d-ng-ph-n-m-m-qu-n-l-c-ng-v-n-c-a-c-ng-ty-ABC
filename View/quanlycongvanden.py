@@ -44,13 +44,13 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(header)
 
         toolbar = QHBoxLayout()
-        self.btn_them = QPushButton("➕ Thêm mới")
+        self.btn_them = QPushButton("➕ ")
         self.btn_them.setStyleSheet("background-color: #28a745; color: white; font-weight: bold; padding: 9px 18px; border-radius: 5px;")
         
-        self.btn_giao_viec = QPushButton("👤 Phân công / Chuyển")
+        self.btn_giao_viec = QPushButton("👤")
         self.btn_giao_viec.setStyleSheet("background-color: #fd7e14; color: white; font-weight: bold; padding: 9px 18px; border-radius: 5px;")
         
-        self.btn_xoa = QPushButton("❌ Xóa")
+        self.btn_xoa = QPushButton("❌ ")
         self.btn_xoa.setStyleSheet("background-color: #dc3545; color: white; font-weight: bold; padding: 9px 18px; border-radius: 5px;")
         
         self.btn_refresh = QPushButton("🔄 Làm mới")
@@ -63,12 +63,22 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(QLabel("Loại VB:"))
         self.cb_loai_vb = QComboBox()
         self.cb_loai_vb.addItem("Tất cả", None)
-        
+        self.cb_loai_vb.currentIndexChanged.connect(self.loc_cv_signal.emit)
+        toolbar.addWidget(self.cb_loai_vb)
+        toolbar.addSpacing(15)
+
+        # ========== THÊM COMBOBOX MỨC ĐỘ ==========
+        toolbar.addWidget(QLabel("Mức độ:"))
+        self.cb_muc_do = QComboBox()
+        self.cb_muc_do.addItems(["Tất cả", "Thường", "Khẩn", "Hỏa tốc"])
+        self.cb_muc_do.setCurrentText("Tất cả")
+        self.cb_muc_do.currentIndexChanged.connect(self.loc_cv_signal.emit)
+        toolbar.addWidget(self.cb_muc_do)
+        # ==========================================
+
         self.chk_bo_qua_ngay = QCheckBox("Bỏ qua ngày")
         self.chk_bo_qua_ngay.setChecked(True)
         toolbar.addWidget(self.chk_bo_qua_ngay)
-        self.cb_loai_vb.currentIndexChanged.connect(self.loc_cv_signal.emit)
-        toolbar.addWidget(self.cb_loai_vb)
         toolbar.addSpacing(25)
 
         toolbar.addWidget(QLabel("Từ ngày:"))
@@ -140,14 +150,12 @@ class MainWindow(QMainWindow):
     def set_nhan_su_list(self, ds):
         self.ds_nhan_su = ds or []
 
-    # 🟢 FIX: Dùng bộ lọc key an toàn chống crash
     def set_loai_van_ban_list(self, ds):
         self.ds_loai_van_ban = ds or []
         self.cb_loai_vb.blockSignals(True)
         self.cb_loai_vb.clear()
         self.cb_loai_vb.addItem("Tất cả", None)
         for item in self.ds_loai_van_ban:
-            # Dùng get an toàn cho cả ten_loai, ten, hoặc TenLoai
             ten = item.get('ten_loai') or item.get('ten') or item.get('TenLoai') or "Chưa rõ"
             id_val = item.get('id') or item.get('Id')
             self.cb_loai_vb.addItem(ten, id_val)
@@ -198,14 +206,16 @@ class MainWindow(QMainWindow):
         style = "padding: 6px 8px; border: 1px solid #b0b0b0; border-radius: 4px;"
 
         loai_vb_cb = QComboBox()
-        # 🟢 FIX: Dùng key an toàn cho ComboBox Thêm
         for item in self.ds_loai_van_ban:
             ten = item.get('ten_loai') or item.get('ten') or item.get('TenLoai') or "Chưa rõ"
             id_val = item.get('id') or item.get('Id')
             loai_vb_cb.addItem(ten, id_val)
 
-        trang_thai_cb = QComboBox()
-        trang_thai_cb.addItems(["Mới tiếp nhận", "Chờ sếp phân công", "Đang xử lý", "Hoàn thành"])
+        # ========== THAY COMBOBOX TRẠNG THÁI BẰNG LABEL ==========
+        trang_thai_label = QLabel("Chờ phân công")
+        trang_thai_label.setStyleSheet("padding: 6px 8px; background-color: #f0f0f0; border-radius: 4px;")
+        trang_thai_value = 1  # Chờ phân công
+        # ========================================================
 
         muc_do_cb = QComboBox()
         muc_do_cb.addItems(["Thường", "Khẩn", "Hỏa tốc"])
@@ -251,7 +261,7 @@ class MainWindow(QMainWindow):
         form.addRow("Hạn xử lý (Deadline):", inputs["han_xu_ly"])
         form.addRow("Trích yếu nội dung:", inputs["trich_yeu"])
         form.addRow("Loại văn bản:", loai_vb_cb)
-        form.addRow("Trạng thái:", trang_thai_cb)
+        form.addRow("Trạng thái:", trang_thai_label)   # <--- dùng label
         form.addRow("Mức độ:", muc_do_cb)
         form.addRow("Đơn vị/Người chủ trì:", inputs["nguoi_xu_ly"])
         form.addRow("File đính kèm:", file_layout)
@@ -268,7 +278,6 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Thiếu thông tin", "Vui lòng nhập đầy đủ Nơi gửi và Số ký hiệu!")
                 return
 
-            map_tt = {"Mới tiếp nhận": 0, "Chờ sếp phân công": 1, "Đang xử lý": 2, "Hoàn thành": 3}
             data = {
                 "ngay_den": inputs["ngay_den"].date().toString("yyyy-MM-dd"),
                 "tac_gia": inputs["tac_gia"].text().strip(),
@@ -277,7 +286,7 @@ class MainWindow(QMainWindow):
                 "han_xu_ly": inputs["han_xu_ly"].date().toString("yyyy-MM-dd"),
                 "trich_yeu": inputs["trich_yeu"].toPlainText().strip(),
                 "phan_loai_id": loai_vb_cb.currentData(),
-                "trang_thai": map_tt.get(trang_thai_cb.currentText(), 0),
+                "trang_thai": trang_thai_value,   # 1 = Chờ phân công
                 "muc_do": muc_do_cb.currentText(),
                 "nguoi_xu_ly": inputs["nguoi_xu_ly"].currentData(), 
                 "ghi_chu": inputs["ghi_chu"].text().strip(),
@@ -301,7 +310,6 @@ class MainWindow(QMainWindow):
         style = "padding: 6px 8px; border: 1px solid #b0b0b0; border-radius: 4px;"
 
         loai_vb_cb = QComboBox()
-        # 🟢 FIX: Dùng key an toàn cho ComboBox Sửa
         for item in self.ds_loai_van_ban:
             ten = item.get('ten_loai') or item.get('ten') or item.get('TenLoai') or "Chưa rõ"
             id_val = item.get('id') or item.get('Id')

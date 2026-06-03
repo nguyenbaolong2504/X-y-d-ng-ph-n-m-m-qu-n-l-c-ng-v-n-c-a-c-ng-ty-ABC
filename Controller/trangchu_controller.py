@@ -31,7 +31,7 @@ class TrangChuController:
         
         self.load_data_den()
         self.load_data_di()
-        self.load_data_noibo() # <-- GỌI NẠP DỮ LIỆU NỘI BỘ
+        self.load_data_noibo()
         self.load_data_congviec()
         self.load_tables_and_panel()
         self.load_chart_data()
@@ -70,40 +70,73 @@ class TrangChuController:
 
     def load_data_den(self):
         try:
-            ds = self.model_den.get_all(is_admin=self.user_session.is_admin_user(), role=self.user_session.get_role(), ten_don_vi=self.user_session.get_ten_don_vi())
+            ds = self.model_den.get_all(
+                is_admin=self.user_session.is_admin_user(),
+                role=self.user_session.get_role(),
+                ten_don_vi=self.user_session.get_ten_don_vi()
+            )
             self.view.card_den.update_data(len(ds))
-        except: pass
+        except Exception as e:
+            print("Lỗi đếm công văn đến:", e)
 
     def load_data_di(self):
-        try: 
-            ds = self.model_di.get_all()
+        try:
+            user_id = self.user_session.user_id
+            role = self.user_session.get_role()
+            if user_id == 1 or role == 'Giám đốc' or role == 'Admin':
+                is_admin = True
+            else:
+                is_admin = self.user_session.is_admin_user()
+            ds = self.model_di.get_all(
+                is_admin=is_admin,
+                role=role,
+                ten_don_vi=self.user_session.get_ten_don_vi(),
+                nguoi_tao_id=user_id
+            )
             self.view.card_di.update_data(len(ds))
-        except: pass
+        except Exception as e:
+            print("Lỗi đếm công văn đi:", e)
 
-    # ==========================================
-    # HÀM NẠP THẺ VĂN BẢN NỘI BỘ MỚI
-    # ==========================================
     def load_data_noibo(self):
         try:
-            # Lấy toàn bộ danh sách văn bản nội bộ bằng hàm get_all() trong ModelNoiBo
-            ds_noibo = self.model_noibo.get_all() 
+            ds_noibo = self.model_noibo.get_all(
+                user_id=self.user_session.user_id,
+                is_admin=self.user_session.is_admin_user()
+            )
             self.view.card_noibo.update_data(len(ds_noibo))
         except Exception as e:
             print("Lỗi tải Văn bản nội bộ:", e)
 
     def load_data_congviec(self):
-        try: 
+        try:
             raw_cv = self.model_congviec.get_cong_viec_cua_toi(self.user_session.user_id, self.user_session.get_role())
             self.view.card_congviec.update_data(len(raw_cv))
-        except: pass
+        except Exception as e:
+            print("Lỗi đếm công việc:", e)
 
     def load_tables_and_panel(self):
-        ds_den = self.model_den.get_all(is_admin=self.user_session.is_admin_user(), role=self.user_session.get_role(), ten_don_vi=self.user_session.get_ten_don_vi())
-        try: ds_di = self.model_di.get_all()
-        except: ds_di = []
-        try: self.view.update_table_den(sorted(ds_den, key=lambda x: str(x.get('NgayNhan', x.get('NgayDen', ''))), reverse=True)[:5])
+        ds_den = self.model_den.get_all(
+            is_admin=self.user_session.is_admin_user(),
+            role=self.user_session.get_role(),
+            ten_don_vi=self.user_session.get_ten_don_vi()
+        )
+        user_id = self.user_session.user_id
+        role = self.user_session.get_role()
+        if user_id == 1 or role == 'Giám đốc' or role == 'Admin':
+            is_admin = True
+        else:
+            is_admin = self.user_session.is_admin_user()
+        ds_di = self.model_di.get_all(
+            is_admin=is_admin,
+            role=role,
+            ten_don_vi=self.user_session.get_ten_don_vi(),
+            nguoi_tao_id=user_id
+        )
+        try:
+            self.view.update_table_den(sorted(ds_den, key=lambda x: str(x.get('NgayDen', x.get('ngay_den', ''))), reverse=True)[:5])
         except: pass
-        try: self.view.update_table_di(sorted(ds_di, key=lambda x: str(x.get('NgayKy', x.get('NgayBanHanh', ''))), reverse=True)[:5])
+        try:
+            self.view.update_table_di(sorted(ds_di, key=lambda x: str(x.get('NgayKy', '')) if x.get('NgayKy') else '', reverse=True)[:5])
         except: pass
         try:
             raw_cv = self.model_congviec.get_cong_viec_cua_toi(self.user_session.user_id, self.user_session.get_role())
@@ -113,9 +146,23 @@ class TrangChuController:
 
     def load_chart_data(self, *args):
         try:
-            ds_den = self.model_den.get_all(is_admin=self.user_session.is_admin_user(), role=self.user_session.get_role(), ten_don_vi=self.user_session.get_ten_don_vi())
-            try: ds_di = self.model_di.get_all()
-            except: ds_di = []
+            user_id = self.user_session.user_id
+            role = self.user_session.get_role()
+            if user_id == 1 or role == 'Giám đốc' or role == 'Admin':
+                is_admin = True
+            else:
+                is_admin = self.user_session.is_admin_user()
+            ds_den = self.model_den.get_all(
+                is_admin=self.user_session.is_admin_user(),
+                role=role,
+                ten_don_vi=self.user_session.get_ten_don_vi()
+            )
+            ds_di = self.model_di.get_all(
+                is_admin=is_admin,
+                role=role,
+                ten_don_vi=self.user_session.get_ten_don_vi(),
+                nguoi_tao_id=user_id
+            )
             
             q_from = self.view.date_from.date()
             q_to = self.view.date_to.date()
@@ -134,16 +181,16 @@ class TrangChuController:
                     hover_labels.append(curr.strftime("%d/%m/%Y"))
                     display_labels.append(curr.strftime("%d/%m") if delta_days <= 10 or i == 0 or i == delta_days or i % 5 == 0 else "")
                     
-                    counts_den.append(sum(1 for item in ds_den if self._check_date(item.get('NgayNhan') or item.get('NgayDen') or item.get('ngay_den'), d=curr.day, m=curr.month, y=curr.year)))
-                    counts_di.append(sum(1 for item in ds_di if self._check_date(item.get('NgayKy') or item.get('NgayBanHanh') or item.get('ngay_ky'), d=curr.day, m=curr.month, y=curr.year)))
+                    counts_den.append(sum(1 for item in ds_den if self._check_date(item.get('NgayDen', item.get('ngay_den')), d=curr.day, m=curr.month, y=curr.year)))
+                    counts_di.append(sum(1 for item in ds_di if self._check_date(item.get('NgayKy'), d=curr.day, m=curr.month, y=curr.year)))
             else:
                 curr_y, curr_m = d_from.year, d_from.month
                 while (curr_y < d_to.year) or (curr_y == d_to.year and curr_m <= d_to.month):
                     hover_labels.append(f"Tháng {curr_m}/{curr_y}")
                     display_labels.append(f"T{curr_m}/{str(curr_y)[2:]}")
                     
-                    counts_den.append(sum(1 for item in ds_den if self._check_date(item.get('NgayNhan') or item.get('NgayDen') or item.get('ngay_den'), m=curr_m, y=curr_y)))
-                    counts_di.append(sum(1 for item in ds_di if self._check_date(item.get('NgayKy') or item.get('NgayBanHanh') or item.get('ngay_ky'), m=curr_m, y=curr_y)))
+                    counts_den.append(sum(1 for item in ds_den if self._check_date(item.get('NgayDen', item.get('ngay_den')), m=curr_m, y=curr_y)))
+                    counts_di.append(sum(1 for item in ds_di if self._check_date(item.get('NgayKy'), m=curr_m, y=curr_y)))
                     
                     curr_m += 1
                     if curr_m > 12: curr_m = 1; curr_y += 1
